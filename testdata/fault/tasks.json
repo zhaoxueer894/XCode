@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "tasks": [
+    {
+      "id": "fault-fix-add",
+      "prompt": "修复 calc.go 里 Add 函数的 bug 并用 go test 验证",
+      "files": {
+        "go.mod": "module buggyapp\n\ngo 1.26\n",
+        "calc.go": "package main\n\nimport \"fmt\"\n\nfunc Add(a int, b int) int {\n\treturn a - b\n}\n\nfunc main() {\n\tfmt.Println(Add(2, 3))\n}\n",
+        "calc_test.go": "package main\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif Add(2, 3) != 5 {\n\t\tt.Fatalf(\"Add(2,3) = %d, want 5\", Add(2, 3))\n\t}\n}\n"
+      },
+      "max_steps": 10,
+      "timeout_seconds": 90,
+      "verify_command": ["go", "test", "./..."],
+      "fault_after_tools": 1,
+      "demo_script": [
+        { "tool": "read_file", "arguments": {"path": "calc.go"} },
+        { "tool": "apply_patch", "arguments": {"path": "calc.go", "operation": "update", "old_string": "return a - b", "new_string": "return a + b"} },
+        { "tool": "exec", "arguments": {"command": ["go", "test", "./..."]} }
+      ]
+    },
+    {
+      "id": "fault-multifix",
+      "prompt": "修复 calc.go 与 util.go 里的两个 bug 并用 go test 验证",
+      "files": {
+        "go.mod": "module buggyapp\n\ngo 1.26\n",
+        "calc.go": "package main\n\nimport \"fmt\"\n\nfunc Add(a int, b int) int {\n\treturn a - b\n}\n\nfunc main() {\n\tfmt.Println(Add(2, 3))\n}\n",
+        "util.go": "package main\n\nfunc Sub(a int, b int) int {\n\treturn a + b\n}\n",
+        "calc_test.go": "package main\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif Add(2, 3) != 5 {\n\t\tt.Fatalf(\"Add(2,3) = %d, want 5\", Add(2, 3))\n\t}\n}\n\nfunc TestSub(t *testing.T) {\n\tif Sub(5, 2) != 3 {\n\t\tt.Fatalf(\"Sub(5,2) = %d, want 3\", Sub(5, 2))\n\t}\n}\n"
+      },
+      "max_steps": 10,
+      "timeout_seconds": 90,
+      "verify_command": ["go", "test", "./..."],
+      "fault_after_tools": 3,
+      "demo_script": [
+        { "tool": "read_file", "arguments": {"path": "calc.go"} },
+        { "tool": "read_file", "arguments": {"path": "util.go"} },
+        { "tool": "apply_patch", "arguments": {"path": "calc.go", "operation": "update", "old_string": "return a - b", "new_string": "return a + b"} },
+        { "tool": "apply_patch", "arguments": {"path": "util.go", "operation": "update", "old_string": "return a + b", "new_string": "return a - b"} },
+        { "tool": "exec", "arguments": {"command": ["go", "test", "./..."]} }
+      ]
+    },
+    {
+      "id": "fault-facts",
+      "prompt": "读取工作区里的说明文件并总结本项目部署约定里的关键数字",
+      "files": {
+        "go.mod": "module buggyapp\n\ngo 1.26\n",
+        "deploy.md": "部署约定：\n- 超时重试上限 3 次\n- 密钥轮换周期 90 天\n- 每日备份保留 14 天\n",
+        "notes-a.md": "背景记录 A：历史迁移说明，内容为占位文本，用于撑起上下文长度，不包含关键事实。这里的文字只是填充，让四次读取可以超过压缩预算。\n",
+        "notes-b.md": "背景记录 B：历史迁移说明，内容为占位文本，用于撑起上下文长度，不包含关键事实。这里的文字只是填充，让四次读取可以超过压缩预算。\n",
+        "notes-c.md": "背景记录 C：历史迁移说明，内容为占位文本，用于撑起上下文长度，不包含关键事实。这里的文字只是填充，让四次读取可以超过压缩预算。\n"
+      },
+      "max_steps": 10,
+      "timeout_seconds": 90,
+      "critical_facts": ["3 次", "90 天"],
+      "fault_after_tools": 3,
+      "demo_script": [
+        { "tool": "read_file", "arguments": {"path": "notes-a.md"} },
+        { "tool": "read_file", "arguments": {"path": "notes-b.md"} },
+        { "tool": "read_file", "arguments": {"path": "notes-c.md"} },
+        { "tool": "read_file", "arguments": {"path": "deploy.md"} }
+      ]
+    },
+    {
+      "id": "fault-patch-crash",
+      "prompt": "修复 calc.go 里 Add 函数的 bug 并用 go test 验证",
+      "files": {
+        "go.mod": "module buggyapp\n\ngo 1.26\n",
+        "calc.go": "package main\n\nimport \"fmt\"\n\nfunc Add(a int, b int) int {\n\treturn a - b\n}\n\nfunc main() {\n\tfmt.Println(Add(2, 3))\n}\n",
+        "calc_test.go": "package main\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif Add(2, 3) != 5 {\n\t\tt.Fatalf(\"Add(2,3) = %d, want 5\", Add(2, 3))\n\t}\n}\n"
+      },
+      "max_steps": 10,
+      "timeout_seconds": 90,
+      "verify_command": ["go", "test", "./..."],
+      "fault_after_tools": 2,
+      "demo_script": [
+        { "tool": "read_file", "arguments": {"path": "calc.go"} },
+        { "tool": "apply_patch", "arguments": {"path": "calc.go", "operation": "update", "old_string": "return a - b", "new_string": "return a + b"} },
+        { "tool": "exec", "arguments": {"command": ["go", "test", "./..."]} }
+      ]
+    },
+    {
+      "id": "fault-gate",
+      "prompt": "给 calc.go 的 Add 函数添加一行中文注释，说明函数用途",
+      "files": {
+        "go.mod": "module buggyapp\n\ngo 1.26\n",
+        "calc.go": "package main\n\nimport \"fmt\"\n\nfunc Add(a int, b int) int {\n\treturn a + b\n}\n\nfunc main() {\n\tfmt.Println(Add(2, 3))\n}\n",
+        "calc_test.go": "package main\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif Add(2, 3) != 6 {\n\t\tt.Fatalf(\"Add(2,3) = %d, want 6\", Add(2, 3))\n\t}\n}\n"
+      },
+      "max_steps": 10,
+      "timeout_seconds": 90,
+      "verify_command": ["go", "test", "./..."],
+      "fault_after_tools": 0,
+      "gate": true,
+      "demo_script": [
+        { "tool": "read_file", "arguments": {"path": "calc.go"} }
+      ]
+    },
+    {
+      "id": "fault-long-recover",
+      "prompt": "阅读背景文件后修复 calc.go 与 util.go 的 bug，并用 go test 验证",
+      "files": {
+        "go.mod": "module buggyapp\n\ngo 1.26\n",
+        "calc.go": "package main\n\nimport \"fmt\"\n\nfunc Add(a int, b int) int {\n\treturn a - b\n}\n\nfunc main() {\n\tfmt.Println(Add(2, 3))\n}\n",
+        "util.go": "package main\n\nfunc Sub(a int, b int) int {\n\treturn a + b\n}\n",
+        "calc_test.go": "package main\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif Add(2, 3) != 5 {\n\t\tt.Fatalf(\"Add(2,3) = %d, want 5\", Add(2, 3))\n\t}\n}\n\nfunc TestSub(t *testing.T) {\n\tif Sub(5, 2) != 3 {\n\t\tt.Fatalf(\"Sub(5,2) = %d, want 3\", Sub(5, 2))\n\t}\n}\n",
+        "bg-a.md": "背景 A：本项目的历史约定记录，这里是较长的占位文本，用于在故障评测中撑起上下文，使决策门控压缩在恢复续跑阶段真实触发。以下为重复填充内容。占位占位占位占位占位占位占位占位占位占位。\n",
+        "bg-b.md": "背景 B：本项目的历史约定记录，这里是较长的占位文本，用于在故障评测中撑起上下文，使决策门控压缩在恢复续跑阶段真实触发。以下为重复填充内容。占位占位占位占位占位占位占位占位占位占位。\n",
+        "bg-c.md": "背景 C：本项目的历史约定记录，这里是较长的占位文本，用于在故障评测中撑起上下文，使决策门控压缩在恢复续跑阶段真实触发。以下为重复填充内容。占位占位占位占位占位占位占位占位占位占位。\n"
+      },
+      "max_steps": 12,
+      "timeout_seconds": 120,
+      "verify_command": ["go", "test", "./..."],
+      "fault_after_tools": 4,
+      "demo_script": [
+        { "tool": "read_file", "arguments": {"path": "bg-a.md"} },
+        { "tool": "read_file", "arguments": {"path": "bg-b.md"} },
+        { "tool": "read_file", "arguments": {"path": "bg-c.md"} },
+        { "tool": "apply_patch", "arguments": {"path": "calc.go", "operation": "update", "old_string": "return a - b", "new_string": "return a + b"} },
+        { "tool": "apply_patch", "arguments": {"path": "util.go", "operation": "update", "old_string": "return a + b", "new_string": "return a - b"} },
+        { "tool": "exec", "arguments": {"command": ["go", "test", "./..."]} }
+      ]
+    }
+  ]
+}

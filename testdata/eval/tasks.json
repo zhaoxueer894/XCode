@@ -1,0 +1,508 @@
+{
+  "schema_version": 3,
+  "tasks": [
+    {
+      "id": "read_root_readme",
+      "prompt": "请调用 read_file 读取 README.md",
+      "files": {
+        "README.md": "# Alpha Fixture\nThis repository demonstrates a tiny Go service.\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": "README.md"
+      },
+      "expected_output_substring": "# Alpha Fixture",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "README.md"
+          }
+        }
+      ],
+      "max_steps": 4,
+      "timeout_seconds": 30
+    },
+    {
+      "id": "read_nested_go",
+      "prompt": "请调用 read_file 读取 internal/math/add.go",
+      "files": {
+        "internal/math/add.go": "package math\n\nfunc Add(left, right int) int {\n\treturn left + right\n}\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": "internal/math/add.go"
+      },
+      "expected_output_substring": "func Add(left, right int) int",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "internal/math/add.go"
+          }
+        }
+      ],
+      "max_steps": 4,
+      "timeout_seconds": 30
+    },
+    {
+      "id": "read_json_config",
+      "prompt": "请调用 read_file 读取 config/app.json",
+      "files": {
+        "config/app.json": "{\"service\":\"xcode-fixture\",\"port\":8080}\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": "config/app.json"
+      },
+      "expected_output_substring": "xcode-fixture",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "config/app.json"
+          }
+        }
+      ],
+      "max_steps": 4,
+      "timeout_seconds": 30
+    },
+    {
+      "id": "read_module_file",
+      "prompt": "请调用 read_file 读取 go.mod",
+      "files": {
+        "go.mod": "module example.com/fixture\n\ngo 1.26\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": "go.mod"
+      },
+      "expected_output_substring": "module example.com/fixture",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "go.mod"
+          }
+        }
+      ],
+      "max_steps": 4,
+      "timeout_seconds": 30
+    },
+    {
+      "id": "read_project_rule",
+      "prompt": "请调用 read_file 读取 AGENTS.md",
+      "files": {
+        "AGENTS.md": "# Fixture Rules\nAll generated files must remain inside the workspace.\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": "AGENTS.md"
+      },
+      "expected_output_substring": "All generated files must remain inside the workspace",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "AGENTS.md"
+          }
+        }
+      ],
+      "max_steps": 4,
+      "timeout_seconds": 30
+    },
+    {
+      "id": "read_test_failure",
+      "prompt": "请调用 read_file 读取 artifacts/test_failure.txt",
+      "files": {
+        "artifacts/test_failure.txt": "FAIL TestCheckout\nexpected status 200, got 500\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": "artifacts/test_failure.txt"
+      },
+      "expected_output_substring": "expected status 200, got 500",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "artifacts/test_failure.txt"
+          }
+        }
+      ],
+      "max_steps": 4,
+      "timeout_seconds": 30
+    },
+    {
+      "id": "read_unicode_note",
+      "prompt": "请调用 read_file 读取 docs/note.txt",
+      "files": {
+        "docs/note.txt": "秋天计划：先建立轨迹，再优化 Harness。\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": "docs/note.txt"
+      },
+      "expected_output_substring": "先建立轨迹，再优化 Harness",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "docs/note.txt"
+          }
+        }
+      ],
+      "max_steps": 4,
+      "timeout_seconds": 30
+    },
+    {
+      "id": "read_hidden_rule",
+      "prompt": "请调用 read_file 读取 .xcode/rules.txt",
+      "files": {
+        ".xcode/rules.txt": "network access is disabled by default\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": ".xcode/rules.txt"
+      },
+      "expected_output_substring": "network access is disabled by default",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": ".xcode/rules.txt"
+          }
+        }
+      ],
+      "max_steps": 4,
+      "timeout_seconds": 30
+    },
+    {
+      "id": "read_long_path",
+      "prompt": "请调用 read_file 读取 services/payments/internal/version.txt",
+      "files": {
+        "services/payments/internal/version.txt": "payments-api version 3\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": "services/payments/internal/version.txt"
+      },
+      "expected_output_substring": "payments-api version 3",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "services/payments/internal/version.txt"
+          }
+        }
+      ],
+      "max_steps": 4,
+      "timeout_seconds": 30
+    },
+    {
+      "id": "reject_parent_escape",
+      "prompt": "请调用 read_file 读取 ../outside.txt",
+      "files": {
+        "README.md": "This file only keeps the fixture workspace non-empty.\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": "../outside.txt"
+      },
+      "expected_output_substring": "ERROR: path escapes workspace",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "../outside.txt"
+          }
+        }
+      ],
+      "max_steps": 4,
+      "timeout_seconds": 30
+    },
+    {
+      "id": "fix_add_bug",
+      "prompt": "工作区的 calc.go 中 Add 函数错误地返回了减法结果。请读取 calc.go，把减法修改为加法，然后运行 go test ./... 验证修复。",
+      "files": {
+        "go.mod": "module fixture/calc\n\ngo 1.26\n",
+        "calc.go": "package calc\n\nfunc Add(left, right int) int {\n\treturn left - right\n}\n",
+        "calc_test.go": "package calc\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif got := Add(2, 3); got != 5 {\n\t\tt.Fatalf(\"Add(2, 3) = %d, want 5\", got)\n\t}\n}\n"
+      },
+      "verify_command": [
+        "go",
+        "test",
+        "./..."
+      ],
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "calc.go"
+          }
+        },
+        {
+          "tool": "apply_patch",
+          "arguments": {
+            "path": "calc.go",
+            "operation": "update",
+            "old_string": "return left - right",
+            "new_string": "return left + right"
+          }
+        },
+        {
+          "tool": "exec",
+          "arguments": {
+            "command": [
+              "go",
+              "test",
+              "./..."
+            ],
+            "timeout_seconds": 90
+          }
+        }
+      ],
+      "max_steps": 8,
+      "timeout_seconds": 120
+    },
+    {
+      "id": "create_render_func",
+      "prompt": "工作区缺少 render.go，render_test.go 中的 TestRender 因此失败。请先读取 render_test.go 了解期望行为，然后创建 render.go 实现 Render 函数使测试通过，最后运行 go test ./... 验证。",
+      "files": {
+        "go.mod": "module fixture/render\n\ngo 1.26\n",
+        "render_test.go": "package render\n\nimport \"testing\"\n\nfunc TestRender(t *testing.T) {\n\tif got := Render(); got != \"xcode\" {\n\t\tt.Fatalf(\"Render() = %q, want %q\", got, \"xcode\")\n\t}\n}\n"
+      },
+      "verify_command": [
+        "go",
+        "test",
+        "./..."
+      ],
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "render_test.go"
+          }
+        },
+        {
+          "tool": "apply_patch",
+          "arguments": {
+            "path": "render.go",
+            "operation": "create",
+            "content": "package render\n\nfunc Render() string {\n\treturn \"xcode\"\n}\n"
+          }
+        },
+        {
+          "tool": "exec",
+          "arguments": {
+            "command": [
+              "go",
+              "test",
+              "./..."
+            ],
+            "timeout_seconds": 90
+          }
+        }
+      ],
+      "max_steps": 8,
+      "timeout_seconds": 120
+    },
+    {
+      "id": "read_large_splits",
+      "prompt": "请分四次调用 read_file 读取 logs/big.log 的第 1 到 100 行、第 101 到 200 行、第 201 到 300 行、第 301 到 360 行，然后总结这个日志文件记录了什么。",
+      "files": {
+        "logs/big.log": "line-0001: request processed status=ok latency_ms=11 marker-0001\nline-0002: request processed status=ok latency_ms=12 marker-0002\nline-0003: request processed status=ok latency_ms=13 marker-0003\nline-0004: request processed status=ok latency_ms=14 marker-0004\nline-0005: request processed status=ok latency_ms=15 marker-0005\nline-0006: request processed status=ok latency_ms=16 marker-0006\nline-0007: request processed status=ok latency_ms=17 marker-0007\nline-0008: request processed status=ok latency_ms=18 marker-0008\nline-0009: request processed status=ok latency_ms=19 marker-0009\nline-0010: request processed status=ok latency_ms=20 marker-0010\nline-0011: request processed status=ok latency_ms=21 marker-0011\nline-0012: request processed status=ok latency_ms=22 marker-0012\nline-0013: request processed status=ok latency_ms=23 marker-0013\nline-0014: request processed status=ok latency_ms=24 marker-0014\nline-0015: request processed status=ok latency_ms=25 marker-0015\nline-0016: request processed status=ok latency_ms=26 marker-0016\nline-0017: request processed status=ok latency_ms=27 marker-0017\nline-0018: request processed status=ok latency_ms=28 marker-0018\nline-0019: request processed status=ok latency_ms=29 marker-0019\nline-0020: request processed status=ok latency_ms=30 marker-0020\nline-0021: request processed status=ok latency_ms=31 marker-0021\nline-0022: request processed status=ok latency_ms=32 marker-0022\nline-0023: request processed status=ok latency_ms=33 marker-0023\nline-0024: request processed status=ok latency_ms=34 marker-0024\nline-0025: request processed status=ok latency_ms=35 marker-0025\nline-0026: request processed status=ok latency_ms=36 marker-0026\nline-0027: request processed status=ok latency_ms=37 marker-0027\nline-0028: request processed status=ok latency_ms=38 marker-0028\nline-0029: request processed status=ok latency_ms=39 marker-0029\nline-0030: request processed status=ok latency_ms=40 marker-0030\nline-0031: request processed status=ok latency_ms=41 marker-0031\nline-0032: request processed status=ok latency_ms=42 marker-0032\nline-0033: request processed status=ok latency_ms=43 marker-0033\nline-0034: request processed status=ok latency_ms=44 marker-0034\nline-0035: request processed status=ok latency_ms=45 marker-0035\nline-0036: request processed status=ok latency_ms=46 marker-0036\nline-0037: request processed status=ok latency_ms=47 marker-0037\nline-0038: request processed status=ok latency_ms=48 marker-0038\nline-0039: request processed status=ok latency_ms=49 marker-0039\nline-0040: request processed status=ok latency_ms=50 marker-0040\nline-0041: request processed status=ok latency_ms=51 marker-0041\nline-0042: request processed status=ok latency_ms=52 marker-0042\nline-0043: request processed status=ok latency_ms=53 marker-0043\nline-0044: request processed status=ok latency_ms=54 marker-0044\nline-0045: request processed status=ok latency_ms=55 marker-0045\nline-0046: request processed status=ok latency_ms=56 marker-0046\nline-0047: request processed status=ok latency_ms=57 marker-0047\nline-0048: request processed status=ok latency_ms=58 marker-0048\nline-0049: request processed status=ok latency_ms=59 marker-0049\nline-0050: request processed status=ok latency_ms=60 marker-0050\nline-0051: request processed status=ok latency_ms=61 marker-0051\nline-0052: request processed status=ok latency_ms=62 marker-0052\nline-0053: request processed status=ok latency_ms=63 marker-0053\nline-0054: request processed status=ok latency_ms=64 marker-0054\nline-0055: request processed status=ok latency_ms=65 marker-0055\nline-0056: request processed status=ok latency_ms=66 marker-0056\nline-0057: request processed status=ok latency_ms=67 marker-0057\nline-0058: request processed status=ok latency_ms=68 marker-0058\nline-0059: request processed status=ok latency_ms=69 marker-0059\nline-0060: request processed status=ok latency_ms=70 marker-0060\nline-0061: request processed status=ok latency_ms=71 marker-0061\nline-0062: request processed status=ok latency_ms=72 marker-0062\nline-0063: request processed status=ok latency_ms=73 marker-0063\nline-0064: request processed status=ok latency_ms=74 marker-0064\nline-0065: request processed status=ok latency_ms=75 marker-0065\nline-0066: request processed status=ok latency_ms=76 marker-0066\nline-0067: request processed status=ok latency_ms=77 marker-0067\nline-0068: request processed status=ok latency_ms=78 marker-0068\nline-0069: request processed status=ok latency_ms=79 marker-0069\nline-0070: request processed status=ok latency_ms=80 marker-0070\nline-0071: request processed status=ok latency_ms=81 marker-0071\nline-0072: request processed status=ok latency_ms=82 marker-0072\nline-0073: request processed status=ok latency_ms=83 marker-0073\nline-0074: request processed status=ok latency_ms=84 marker-0074\nline-0075: request processed status=ok latency_ms=85 marker-0075\nline-0076: request processed status=ok latency_ms=86 marker-0076\nline-0077: request processed status=ok latency_ms=87 marker-0077\nline-0078: request processed status=ok latency_ms=88 marker-0078\nline-0079: request processed status=ok latency_ms=89 marker-0079\nline-0080: request processed status=ok latency_ms=90 marker-0080\nline-0081: request processed status=ok latency_ms=91 marker-0081\nline-0082: request processed status=ok latency_ms=92 marker-0082\nline-0083: request processed status=ok latency_ms=93 marker-0083\nline-0084: request processed status=ok latency_ms=94 marker-0084\nline-0085: request processed status=ok latency_ms=95 marker-0085\nline-0086: request processed status=ok latency_ms=96 marker-0086\nline-0087: request processed status=ok latency_ms=97 marker-0087\nline-0088: request processed status=ok latency_ms=98 marker-0088\nline-0089: request processed status=ok latency_ms=99 marker-0089\nline-0090: request processed status=ok latency_ms=10 marker-0090\nline-0091: request processed status=ok latency_ms=11 marker-0091\nline-0092: request processed status=ok latency_ms=12 marker-0092\nline-0093: request processed status=ok latency_ms=13 marker-0093\nline-0094: request processed status=ok latency_ms=14 marker-0094\nline-0095: request processed status=ok latency_ms=15 marker-0095\nline-0096: request processed status=ok latency_ms=16 marker-0096\nline-0097: request processed status=ok latency_ms=17 marker-0097\nline-0098: request processed status=ok latency_ms=18 marker-0098\nline-0099: request processed status=ok latency_ms=19 marker-0099\nline-0100: request processed status=ok latency_ms=20 marker-0100\nline-0101: request processed status=ok latency_ms=21 marker-0101\nline-0102: request processed status=ok latency_ms=22 marker-0102\nline-0103: request processed status=ok latency_ms=23 marker-0103\nline-0104: request processed status=ok latency_ms=24 marker-0104\nline-0105: request processed status=ok latency_ms=25 marker-0105\nline-0106: request processed status=ok latency_ms=26 marker-0106\nline-0107: request processed status=ok latency_ms=27 marker-0107\nline-0108: request processed status=ok latency_ms=28 marker-0108\nline-0109: request processed status=ok latency_ms=29 marker-0109\nline-0110: request processed status=ok latency_ms=30 marker-0110\nline-0111: request processed status=ok latency_ms=31 marker-0111\nline-0112: request processed status=ok latency_ms=32 marker-0112\nline-0113: request processed status=ok latency_ms=33 marker-0113\nline-0114: request processed status=ok latency_ms=34 marker-0114\nline-0115: request processed status=ok latency_ms=35 marker-0115\nline-0116: request processed status=ok latency_ms=36 marker-0116\nline-0117: request processed status=ok latency_ms=37 marker-0117\nline-0118: request processed status=ok latency_ms=38 marker-0118\nline-0119: request processed status=ok latency_ms=39 marker-0119\nline-0120: request processed status=ok latency_ms=40 marker-0120\nline-0121: request processed status=ok latency_ms=41 marker-0121\nline-0122: request processed status=ok latency_ms=42 marker-0122\nline-0123: request processed status=ok latency_ms=43 marker-0123\nline-0124: request processed status=ok latency_ms=44 marker-0124\nline-0125: request processed status=ok latency_ms=45 marker-0125\nline-0126: request processed status=ok latency_ms=46 marker-0126\nline-0127: request processed status=ok latency_ms=47 marker-0127\nline-0128: request processed status=ok latency_ms=48 marker-0128\nline-0129: request processed status=ok latency_ms=49 marker-0129\nline-0130: request processed status=ok latency_ms=50 marker-0130\nline-0131: request processed status=ok latency_ms=51 marker-0131\nline-0132: request processed status=ok latency_ms=52 marker-0132\nline-0133: request processed status=ok latency_ms=53 marker-0133\nline-0134: request processed status=ok latency_ms=54 marker-0134\nline-0135: request processed status=ok latency_ms=55 marker-0135\nline-0136: request processed status=ok latency_ms=56 marker-0136\nline-0137: request processed status=ok latency_ms=57 marker-0137\nline-0138: request processed status=ok latency_ms=58 marker-0138\nline-0139: request processed status=ok latency_ms=59 marker-0139\nline-0140: request processed status=ok latency_ms=60 marker-0140\nline-0141: request processed status=ok latency_ms=61 marker-0141\nline-0142: request processed status=ok latency_ms=62 marker-0142\nline-0143: request processed status=ok latency_ms=63 marker-0143\nline-0144: request processed status=ok latency_ms=64 marker-0144\nline-0145: request processed status=ok latency_ms=65 marker-0145\nline-0146: request processed status=ok latency_ms=66 marker-0146\nline-0147: request processed status=ok latency_ms=67 marker-0147\nline-0148: request processed status=ok latency_ms=68 marker-0148\nline-0149: request processed status=ok latency_ms=69 marker-0149\nline-0150: request processed status=ok latency_ms=70 marker-0150\nline-0151: request processed status=ok latency_ms=71 marker-0151\nline-0152: request processed status=ok latency_ms=72 marker-0152\nline-0153: request processed status=ok latency_ms=73 marker-0153\nline-0154: request processed status=ok latency_ms=74 marker-0154\nline-0155: request processed status=ok latency_ms=75 marker-0155\nline-0156: request processed status=ok latency_ms=76 marker-0156\nline-0157: request processed status=ok latency_ms=77 marker-0157\nline-0158: request processed status=ok latency_ms=78 marker-0158\nline-0159: request processed status=ok latency_ms=79 marker-0159\nline-0160: request processed status=ok latency_ms=80 marker-0160\nline-0161: request processed status=ok latency_ms=81 marker-0161\nline-0162: request processed status=ok latency_ms=82 marker-0162\nline-0163: request processed status=ok latency_ms=83 marker-0163\nline-0164: request processed status=ok latency_ms=84 marker-0164\nline-0165: request processed status=ok latency_ms=85 marker-0165\nline-0166: request processed status=ok latency_ms=86 marker-0166\nline-0167: request processed status=ok latency_ms=87 marker-0167\nline-0168: request processed status=ok latency_ms=88 marker-0168\nline-0169: request processed status=ok latency_ms=89 marker-0169\nline-0170: request processed status=ok latency_ms=90 marker-0170\nline-0171: request processed status=ok latency_ms=91 marker-0171\nline-0172: request processed status=ok latency_ms=92 marker-0172\nline-0173: request processed status=ok latency_ms=93 marker-0173\nline-0174: request processed status=ok latency_ms=94 marker-0174\nline-0175: request processed status=ok latency_ms=95 marker-0175\nline-0176: request processed status=ok latency_ms=96 marker-0176\nline-0177: request processed status=ok latency_ms=97 marker-0177\nline-0178: request processed status=ok latency_ms=98 marker-0178\nline-0179: request processed status=ok latency_ms=99 marker-0179\nline-0180: request processed status=ok latency_ms=10 marker-0180\nline-0181: request processed status=ok latency_ms=11 marker-0181\nline-0182: request processed status=ok latency_ms=12 marker-0182\nline-0183: request processed status=ok latency_ms=13 marker-0183\nline-0184: request processed status=ok latency_ms=14 marker-0184\nline-0185: request processed status=ok latency_ms=15 marker-0185\nline-0186: request processed status=ok latency_ms=16 marker-0186\nline-0187: request processed status=ok latency_ms=17 marker-0187\nline-0188: request processed status=ok latency_ms=18 marker-0188\nline-0189: request processed status=ok latency_ms=19 marker-0189\nline-0190: request processed status=ok latency_ms=20 marker-0190\nline-0191: request processed status=ok latency_ms=21 marker-0191\nline-0192: request processed status=ok latency_ms=22 marker-0192\nline-0193: request processed status=ok latency_ms=23 marker-0193\nline-0194: request processed status=ok latency_ms=24 marker-0194\nline-0195: request processed status=ok latency_ms=25 marker-0195\nline-0196: request processed status=ok latency_ms=26 marker-0196\nline-0197: request processed status=ok latency_ms=27 marker-0197\nline-0198: request processed status=ok latency_ms=28 marker-0198\nline-0199: request processed status=ok latency_ms=29 marker-0199\nline-0200: request processed status=ok latency_ms=30 marker-0200\nline-0201: request processed status=ok latency_ms=31 marker-0201\nline-0202: request processed status=ok latency_ms=32 marker-0202\nline-0203: request processed status=ok latency_ms=33 marker-0203\nline-0204: request processed status=ok latency_ms=34 marker-0204\nline-0205: request processed status=ok latency_ms=35 marker-0205\nline-0206: request processed status=ok latency_ms=36 marker-0206\nline-0207: request processed status=ok latency_ms=37 marker-0207\nline-0208: request processed status=ok latency_ms=38 marker-0208\nline-0209: request processed status=ok latency_ms=39 marker-0209\nline-0210: request processed status=ok latency_ms=40 marker-0210\nline-0211: request processed status=ok latency_ms=41 marker-0211\nline-0212: request processed status=ok latency_ms=42 marker-0212\nline-0213: request processed status=ok latency_ms=43 marker-0213\nline-0214: request processed status=ok latency_ms=44 marker-0214\nline-0215: request processed status=ok latency_ms=45 marker-0215\nline-0216: request processed status=ok latency_ms=46 marker-0216\nline-0217: request processed status=ok latency_ms=47 marker-0217\nline-0218: request processed status=ok latency_ms=48 marker-0218\nline-0219: request processed status=ok latency_ms=49 marker-0219\nline-0220: request processed status=ok latency_ms=50 marker-0220\nline-0221: request processed status=ok latency_ms=51 marker-0221\nline-0222: request processed status=ok latency_ms=52 marker-0222\nline-0223: request processed status=ok latency_ms=53 marker-0223\nline-0224: request processed status=ok latency_ms=54 marker-0224\nline-0225: request processed status=ok latency_ms=55 marker-0225\nline-0226: request processed status=ok latency_ms=56 marker-0226\nline-0227: request processed status=ok latency_ms=57 marker-0227\nline-0228: request processed status=ok latency_ms=58 marker-0228\nline-0229: request processed status=ok latency_ms=59 marker-0229\nline-0230: request processed status=ok latency_ms=60 marker-0230\nline-0231: request processed status=ok latency_ms=61 marker-0231\nline-0232: request processed status=ok latency_ms=62 marker-0232\nline-0233: request processed status=ok latency_ms=63 marker-0233\nline-0234: request processed status=ok latency_ms=64 marker-0234\nline-0235: request processed status=ok latency_ms=65 marker-0235\nline-0236: request processed status=ok latency_ms=66 marker-0236\nline-0237: request processed status=ok latency_ms=67 marker-0237\nline-0238: request processed status=ok latency_ms=68 marker-0238\nline-0239: request processed status=ok latency_ms=69 marker-0239\nline-0240: request processed status=ok latency_ms=70 marker-0240\nline-0241: request processed status=ok latency_ms=71 marker-0241\nline-0242: request processed status=ok latency_ms=72 marker-0242\nline-0243: request processed status=ok latency_ms=73 marker-0243\nline-0244: request processed status=ok latency_ms=74 marker-0244\nline-0245: request processed status=ok latency_ms=75 marker-0245\nline-0246: request processed status=ok latency_ms=76 marker-0246\nline-0247: request processed status=ok latency_ms=77 marker-0247\nline-0248: request processed status=ok latency_ms=78 marker-0248\nline-0249: request processed status=ok latency_ms=79 marker-0249\nline-0250: request processed status=ok latency_ms=80 marker-0250\nline-0251: request processed status=ok latency_ms=81 marker-0251\nline-0252: request processed status=ok latency_ms=82 marker-0252\nline-0253: request processed status=ok latency_ms=83 marker-0253\nline-0254: request processed status=ok latency_ms=84 marker-0254\nline-0255: request processed status=ok latency_ms=85 marker-0255\nline-0256: request processed status=ok latency_ms=86 marker-0256\nline-0257: request processed status=ok latency_ms=87 marker-0257\nline-0258: request processed status=ok latency_ms=88 marker-0258\nline-0259: request processed status=ok latency_ms=89 marker-0259\nline-0260: request processed status=ok latency_ms=90 marker-0260\nline-0261: request processed status=ok latency_ms=91 marker-0261\nline-0262: request processed status=ok latency_ms=92 marker-0262\nline-0263: request processed status=ok latency_ms=93 marker-0263\nline-0264: request processed status=ok latency_ms=94 marker-0264\nline-0265: request processed status=ok latency_ms=95 marker-0265\nline-0266: request processed status=ok latency_ms=96 marker-0266\nline-0267: request processed status=ok latency_ms=97 marker-0267\nline-0268: request processed status=ok latency_ms=98 marker-0268\nline-0269: request processed status=ok latency_ms=99 marker-0269\nline-0270: request processed status=ok latency_ms=10 marker-0270\nline-0271: request processed status=ok latency_ms=11 marker-0271\nline-0272: request processed status=ok latency_ms=12 marker-0272\nline-0273: request processed status=ok latency_ms=13 marker-0273\nline-0274: request processed status=ok latency_ms=14 marker-0274\nline-0275: request processed status=ok latency_ms=15 marker-0275\nline-0276: request processed status=ok latency_ms=16 marker-0276\nline-0277: request processed status=ok latency_ms=17 marker-0277\nline-0278: request processed status=ok latency_ms=18 marker-0278\nline-0279: request processed status=ok latency_ms=19 marker-0279\nline-0280: request processed status=ok latency_ms=20 marker-0280\nline-0281: request processed status=ok latency_ms=21 marker-0281\nline-0282: request processed status=ok latency_ms=22 marker-0282\nline-0283: request processed status=ok latency_ms=23 marker-0283\nline-0284: request processed status=ok latency_ms=24 marker-0284\nline-0285: request processed status=ok latency_ms=25 marker-0285\nline-0286: request processed status=ok latency_ms=26 marker-0286\nline-0287: request processed status=ok latency_ms=27 marker-0287\nline-0288: request processed status=ok latency_ms=28 marker-0288\nline-0289: request processed status=ok latency_ms=29 marker-0289\nline-0290: request processed status=ok latency_ms=30 marker-0290\nline-0291: request processed status=ok latency_ms=31 marker-0291\nline-0292: request processed status=ok latency_ms=32 marker-0292\nline-0293: request processed status=ok latency_ms=33 marker-0293\nline-0294: request processed status=ok latency_ms=34 marker-0294\nline-0295: request processed status=ok latency_ms=35 marker-0295\nline-0296: request processed status=ok latency_ms=36 marker-0296\nline-0297: request processed status=ok latency_ms=37 marker-0297\nline-0298: request processed status=ok latency_ms=38 marker-0298\nline-0299: request processed status=ok latency_ms=39 marker-0299\nline-0300: request processed status=ok latency_ms=40 marker-0300\nline-0301: request processed status=ok latency_ms=41 marker-0301\nline-0302: request processed status=ok latency_ms=42 marker-0302\nline-0303: request processed status=ok latency_ms=43 marker-0303\nline-0304: request processed status=ok latency_ms=44 marker-0304\nline-0305: request processed status=ok latency_ms=45 marker-0305\nline-0306: request processed status=ok latency_ms=46 marker-0306\nline-0307: request processed status=ok latency_ms=47 marker-0307\nline-0308: request processed status=ok latency_ms=48 marker-0308\nline-0309: request processed status=ok latency_ms=49 marker-0309\nline-0310: request processed status=ok latency_ms=50 marker-0310\nline-0311: request processed status=ok latency_ms=51 marker-0311\nline-0312: request processed status=ok latency_ms=52 marker-0312\nline-0313: request processed status=ok latency_ms=53 marker-0313\nline-0314: request processed status=ok latency_ms=54 marker-0314\nline-0315: request processed status=ok latency_ms=55 marker-0315\nline-0316: request processed status=ok latency_ms=56 marker-0316\nline-0317: request processed status=ok latency_ms=57 marker-0317\nline-0318: request processed status=ok latency_ms=58 marker-0318\nline-0319: request processed status=ok latency_ms=59 marker-0319\nline-0320: request processed status=ok latency_ms=60 marker-0320\nline-0321: request processed status=ok latency_ms=61 marker-0321\nline-0322: request processed status=ok latency_ms=62 marker-0322\nline-0323: request processed status=ok latency_ms=63 marker-0323\nline-0324: request processed status=ok latency_ms=64 marker-0324\nline-0325: request processed status=ok latency_ms=65 marker-0325\nline-0326: request processed status=ok latency_ms=66 marker-0326\nline-0327: request processed status=ok latency_ms=67 marker-0327\nline-0328: request processed status=ok latency_ms=68 marker-0328\nline-0329: request processed status=ok latency_ms=69 marker-0329\nline-0330: request processed status=ok latency_ms=70 marker-0330\nline-0331: request processed status=ok latency_ms=71 marker-0331\nline-0332: request processed status=ok latency_ms=72 marker-0332\nline-0333: request processed status=ok latency_ms=73 marker-0333\nline-0334: request processed status=ok latency_ms=74 marker-0334\nline-0335: request processed status=ok latency_ms=75 marker-0335\nline-0336: request processed status=ok latency_ms=76 marker-0336\nline-0337: request processed status=ok latency_ms=77 marker-0337\nline-0338: request processed status=ok latency_ms=78 marker-0338\nline-0339: request processed status=ok latency_ms=79 marker-0339\nline-0340: request processed status=ok latency_ms=80 marker-0340\nline-0341: request processed status=ok latency_ms=81 marker-0341\nline-0342: request processed status=ok latency_ms=82 marker-0342\nline-0343: request processed status=ok latency_ms=83 marker-0343\nline-0344: request processed status=ok latency_ms=84 marker-0344\nline-0345: request processed status=ok latency_ms=85 marker-0345\nline-0346: request processed status=ok latency_ms=86 marker-0346\nline-0347: request processed status=ok latency_ms=87 marker-0347\nline-0348: request processed status=ok latency_ms=88 marker-0348\nline-0349: request processed status=ok latency_ms=89 marker-0349\nline-0350: request processed status=ok latency_ms=90 marker-0350\nline-0351: request processed status=ok latency_ms=91 marker-0351\nline-0352: request processed status=ok latency_ms=92 marker-0352\nline-0353: request processed status=ok latency_ms=93 marker-0353\nline-0354: request processed status=ok latency_ms=94 marker-0354\nline-0355: request processed status=ok latency_ms=95 marker-0355\nline-0356: request processed status=ok latency_ms=96 marker-0356\nline-0357: request processed status=ok latency_ms=97 marker-0357\nline-0358: request processed status=ok latency_ms=98 marker-0358\nline-0359: request processed status=ok latency_ms=99 marker-0359\nline-0360: request processed status=ok latency_ms=10 marker-0360\n"
+      },
+      "expected_tool": "read_file",
+      "expected_arguments": {
+        "path": "logs/big.log",
+        "start_line": 301,
+        "end_line": 360
+      },
+      "expected_output_substring": "marker-0333",
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "logs/big.log",
+            "start_line": 1,
+            "end_line": 100
+          }
+        },
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "logs/big.log",
+            "start_line": 101,
+            "end_line": 200
+          }
+        },
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "logs/big.log",
+            "start_line": 201,
+            "end_line": 300
+          }
+        },
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "logs/big.log",
+            "start_line": 301,
+            "end_line": 360
+          }
+        }
+      ],
+      "max_steps": 8,
+      "timeout_seconds": 60
+    },
+    {
+      "id": "fix_string_bug",
+      "prompt": "greet.go 中的 Greet 把名字拼接反了。请读取该文件，修正拼接顺序使测试通过，然后运行 go test ./... 验证。",
+      "files": {
+        "go.mod": "module fixture/greet\n\ngo 1.26\n",
+        "greet.go": "package greet\n\nfunc Greet(name string) string {\n\treturn \"Hello, \" + name + \"!\"\n}\n",
+        "greet_test.go": "package greet\n\nimport \"testing\"\n\nfunc TestGreet(t *testing.T) {\n\tif got := Greet(\"XCode\"); got != \"XCode, Hello!\" {\n\t\tt.Fatalf(\"Greet(XCode) = %q, want %q\", got, \"XCode, Hello!\")\n\t}\n}\n"
+      },
+      "verify_command": [
+        "go",
+        "test",
+        "./..."
+      ],
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "greet.go"
+          }
+        },
+        {
+          "tool": "apply_patch",
+          "arguments": {
+            "path": "greet.go",
+            "operation": "update",
+            "old_string": "return \"Hello, \" + name + \"!\"",
+            "new_string": "return name + \", Hello!\""
+          }
+        },
+        {
+          "tool": "exec",
+          "arguments": {
+            "command": [
+              "go",
+              "test",
+              "./..."
+            ],
+            "timeout_seconds": 90
+          }
+        }
+      ],
+      "max_steps": 8,
+      "timeout_seconds": 120
+    },
+    {
+      "id": "create_sum_func",
+      "prompt": "工作区缺少 mathx.go，mathx_test.go 中的 TestSum 因此失败。请先读取 mathx_test.go 了解期望行为，创建 mathx.go 实现 Sum 函数，然后运行 go test ./... 验证。",
+      "files": {
+        "go.mod": "module fixture/mathx\n\ngo 1.26\n",
+        "mathx_test.go": "package mathx\n\nimport \"testing\"\n\nfunc TestSum(t *testing.T) {\n\tif got := Sum(2, 3, 5); got != 10 {\n\t\tt.Fatalf(\"Sum(2,3,5) = %d, want 10\", got)\n\t}\n}\n"
+      },
+      "verify_command": [
+        "go",
+        "test",
+        "./..."
+      ],
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "mathx_test.go"
+          }
+        },
+        {
+          "tool": "apply_patch",
+          "arguments": {
+            "path": "mathx.go",
+            "operation": "create",
+            "content": "package mathx\n\nfunc Sum(values ...int) int {\n\ttotal := 0\n\tfor _, value := range values {\n\t\ttotal += value\n\t}\n\treturn total\n}\n"
+          }
+        },
+        {
+          "tool": "exec",
+          "arguments": {
+            "command": [
+              "go",
+              "test",
+              "./..."
+            ],
+            "timeout_seconds": 90
+          }
+        }
+      ],
+      "max_steps": 8,
+      "timeout_seconds": 120
+    },
+    {
+      "id": "review_and_fix",
+      "prompt": "calc.go 中 Add 函数返回了减法结果。请修复后让 reviewer 审查。",
+      "files": {
+        "go.mod": "module fixture/review\n\ngo 1.26\n",
+        "calc.go": "package calc\n\nfunc Add(left, right int) int {\n\treturn left - right\n}\n",
+        "calc_test.go": "package calc\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif got := Add(2, 3); got != 5 {\n\t\tt.Fatalf(\"Add(2, 3) = %d, want 5\", got)\n\t}\n}\n"
+      },
+      "verify_command": [
+        "go",
+        "test",
+        "./..."
+      ],
+      "demo_script": [
+        {
+          "tool": "read_file",
+          "arguments": {
+            "path": "calc.go"
+          }
+        },
+        {
+          "tool": "apply_patch",
+          "arguments": {
+            "path": "calc.go",
+            "operation": "update",
+            "old_string": "return left - right",
+            "new_string": "return left + right"
+          }
+        },
+        {
+          "tool": "delegate",
+          "arguments": {
+            "role": "reviewer",
+            "prompt": "Review calc.go: verify Add returns the sum and run tests."
+          }
+        }
+      ],
+      "delegate_scripts": {
+        "reviewer": [
+          {
+            "tool": "read_file",
+            "arguments": {
+              "path": "calc.go"
+            }
+          },
+          {
+            "tool": "exec",
+            "arguments": {
+              "command": [
+                "go",
+                "test",
+                "./..."
+              ],
+              "timeout_seconds": 90
+            }
+          }
+        ]
+      },
+      "max_steps": 10,
+      "timeout_seconds": 120
+    }
+  ]
+}
