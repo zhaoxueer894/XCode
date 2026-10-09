@@ -1,81 +1,81 @@
 # XCode
 
-基于大语言模型的多智能体编码系统，Go 实现。XCode 在真实工作区中完成编码任务：理解需求、检索代码、修改文件、运行验证并报告证据。系统采用 Orchestrator-Worker 多智能体架构，内置工具安全管线与轨迹评测闭环。
+XCode 是一个用 Go 写的多智能体编码工具。你给它一个任务（比如"修复这个 bug 并跑通测试"），它会在指定的工作区里读代码、改代码、运行命令，最后告诉你做了什么、结果如何。整个过程中所有文件改动、命令执行和审查结论都有记录，可以事后查看。
 
-## 多智能体协作机制
+它不是把同一个模型调几次，而是由几个角色不同的智能体分工协作：
 
-- **角色化子智能体**：编排者（主智能体）通过 `delegate` 工具将子任务委派给角色化子智能体，内置三个角色——`planner`（分解任务，不修改文件）、`developer`（最小化修改并运行验证）、`reviewer`（独立审查，输出 pass / issues-found）；角色可通过 `.xcode/skills/<role>.md` 自定义。
-- **独立上下文**：每次委派创建全新的子智能体实例（独立消息历史、独立执行循环、独立停止条件），不继承父级对话，仅通过结构化任务包下行、摘要与证据上行。
-- **事件桥接**：子智能体事件携带 `agent_id` 与 `agent.spawned` / `agent.completed` 生命周期标记，汇入统一事件流与轨迹。
-- **完成门禁**：智能体声称任务完成时，Harness 强制发起 fresh-context 的 reviewer 独立审查（`GATE-VERDICT: PASS / ISSUES`），不通过则将失败证据回注循环继续修复；环境真实结果（编译、测试退出码）是最终事实源，不采信模型自述。
-- **对照评测**：`xcode eval --no-delegate` 可关闭委派做单智能体 A/B 对照，量化多智能体协作的收益与成本。
+- **编排者**接你的任务，决定要不要拆解、派活；
+- **developer** 负责动手改代码、跑验证；
+- **reviewer** 是一个独立检查者，它看不到 developer 的思考过程，只看最终的代码和工作区状态，给出通过或打回。模型声称"做完了"时，XCode 会强制让 reviewer 检查一遍，环境里的真实结果（编译、测试是否通过）说了算。
 
-## 工具与安全
-
-- 内置工具：`list_files`、`search_text`、`read_file`、`apply_patch`、`exec`、`git_diff`、`read_skill`。
-- 统一执行管线：参数规范化 → 策略决策（`allow / ask / deny`）→ 审批（once / session）→ 写前快照 → 沙箱执行（`host` / `docker` / `docker-wsl`）→ 输出虚拟化 → 状态落库。
-- ToolCall 状态机：`planned → approved → started → succeeded / failed / unknown`；进程崩溃窗口判 `unknown`，非幂等操作绝不自动重放。
-- 能力档位：`plan` / `workspace-write` / `full-access`，默认 `workspace-write`；命令超时终止完整进程树，输出上限 2 MiB。
-
-## 上下文与记忆
-
-- Token 预算与四种上下文策略：`none` / `sliding` / `handoff` / `compaction`。
-- 工具结果虚拟化：完整结果存入 Artifact Store，上下文只保留预览，可按 `artifact_id` 回取。
-- ReadSet 去重：内容哈希 + Context Epoch 判定重复读取，内容变更自动失效。
-- 分层记忆：L0 轮内工作笔记、L1 会话笔记、L2 项目记忆（`.xcode/memory.md`）。
-
-## 评测闭环
-
-- 每轮运行产生 append-only JSONL 轨迹（事件、策略、审批、快照、工具状态全量记录）。
-- 多 Trial 评测：成功率、轮次、工具调用、token、耗时与方差报告（JSON / Markdown / HTML）。
-- 基线锁定与对比：`xcode eval baseline save` / `xcode eval compare`，五级判定（improved / regressed / unchanged / new / missing），存在回归时退出码非零。
-- 失败聚类与故障评测：失败签名归簇、故障注入任务与 Trace Replay。
+工具执行有安全约束：写文件之前会做快照（可恢复），命令默认限定在工作区内，敏感操作需要你确认。
 
 ## 快速开始
 
+需要 Go 1.26+。不需要任何 API Key，内置一个确定性演示模型：
+
 ```bash
 go build -o bin/xcode.exe ./cmd/xcode
-
-# 离线演示（无需 API Key，内置确定性模型）
-bin/xcode.exe --provider demo "读取 README.md 并总结"
-
-# 真实模型：复制 .env.example 为 .env，填入密钥（该文件已被 Git 忽略）
-bin/xcode.exe "修复 xxx.go 中的越界 bug 并运行测试"
+bin/xcode.exe --provider demo "please read go.mod"
 ```
 
-## 配置
+demo 模型只会解析提示词里最后一个词当作文件名去读，仅用于跑通流程，别对它抱期望。真实任务请接下面的真实模型。
 
-| 文件 | 用途 |
-|---|---|
-| `.xcode/config` | 运行配置：provider、mode、context-strategy、max-steps、sandbox、timeout 等；优先级 CLI flag > 项目级 > `~/.xcode/config` > 内置默认 |
-| `.xcode/policy.json` | 工具策略规则（路径前缀、命令前缀的 allow/deny） |
-| `.xcode/skills/<role>.md` | delegate 角色定义 |
-| `.xcode/memory.md` | L2 项目记忆，运行时只读注入 |
-| `.env` | 模型密钥（参考 `.env.example`；保持 0600 权限，禁止提交） |
+## 配置模型
 
-## 目录结构
+主模型用的是**阿里云百炼的通义千问**（默认 `qwen-plus`，可换成百炼上的其他模型），通过百炼的 OpenAI 兼容接口调用。配置三步：
 
+1. 在项目根目录创建 `.env` 文件（模板见 `.env.example`），填入你在百炼控制台拿到的 API Key：
+
+   ```
+   DASHSCOPE_API_KEY=sk-xxxxxxxx
+   DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+   DASHSCOPE_MODEL=qwen-plus
+   ```
+
+2. Linux/macOS 下把权限收紧到 `chmod 600 .env`；这个文件已被 `.gitignore` 排除，不会被提交。
+
+3. 运行时通过 `--provider bailian` 显式选择真实模型：
+
+   ```bash
+   bin/xcode.exe --provider bailian "修复 utils.go 里的越界问题并运行 go test"
+   ```
+
+   不想每次敲 flag 的话，在 `.xcode/config` 里写一行 `provider=bailian` 即可。注意：只配 `.env` 不切 provider 的话，跑的仍然是 demo 模型。
+
+## 可选：压缩决策分类器（jev）
+
+这是一个实验性功能，不配置完全不影响正常使用。
+
+长对话会被压缩以节省上下文。压缩时 XCode 把历史拆成一个个"证据单元"，决定哪些保留、哪些截断、哪些丢弃——默认由内置规则决定。如果你想用模型来做这些决定，有两种后端：
+
+- **local**：用百炼的 qwen 聊天模型当分类器，直接复用 `.env` 里的 Key，零额外配置。这是对照基线。
+- **jev**：调用 TypeSafe 的 systemone 分类服务。需要单独申请并设置三个环境变量：
+
+  ```
+  TYPESAFE_API_KEY=你的密钥
+  TYPESAFE_ENDPOINT=服务端点地址
+  TYPESAFE_MODEL=模型名
+  ```
+
+  然后在 `.xcode/config` 里写 `typed-classifier=jev`（不写默认 local），运行时加 `--typed-shadow` 开启。
+
+shadow 指的是分类结果只记录、不生效——真实压缩仍走规则，方便对比模型和规则谁判得好。
+
+## 常用配置
+
+运行参数优先级：命令行 flag > 项目级 `.xcode/config` > 全局 `~/.xcode/config` > 内置默认值。常用的几项：
+
+```text
+provider=bailian          # demo 或 bailian
+mode=workspace-write      # plan / workspace-write / full-access
+context-strategy=none     # none / sliding / handoff / compaction
+max-steps=8               # 单次任务最大模型轮数
+sandbox=host              # host / docker / docker-wsl
+timeout=2m
 ```
-cmd/xcode/          CLI 入口（run / eval / checkpoint / journal / policy / resume 等子命令）
-internal/
-  harness/          Agent 循环、delegate 多智能体、完成门禁、会话与运行日志
-  executor/         统一工具执行器（信号量、审批、journal）
-  policy/           策略引擎与规则文件
-  sandbox/          沙箱后端（host / docker / docker-wsl）
-  checkpoint/       写前快照与恢复
-  recovery/         崩溃恢复与副作用对账
-  contextmgr/       上下文投影、压缩策略、决策门控压缩
-  memory/           L0-L2 分层记忆与技能加载
-  tools/            全部工具实现
-  workspace/        工作区索引、忽略规则、ReadSet、指纹
-  artifactstore/    内容寻址 Artifact 存储
-  eventstore/       JSONL 事件存储
-  eval/             评测运行器、报告、基线对比、失败聚类
-  faulteval/        长任务故障注入评测与 Trace Replay
-  model/            模型适配（demo、bailian 流式协议、jev 分类器）
-  config/           配置文件加载
-testdata/           评测任务目录
-```
+
+其他可选文件：`.xcode/policy.json`（工具放行/拒绝规则）、`.xcode/skills/<角色>.md`（自定义 delegate 角色）、`.xcode/memory.md`（项目级记忆，每次运行注入）。
 
 ## 测试
 
