@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "execution_environment": {
+    "cpus": 2,
+    "memory_mb": 4096,
+    "go_env": {
+      "GOMAXPROCS": "2",
+      "GOFLAGS": "-p=2"
+    },
+    "reason": "Align pre-cgroup-aware Go runtimes and package parallelism to the actual container CPU quota; tests and upstream graders are unchanged."
+  },
+  "selection_policy": "Development regression replay of the same two previously observed issues after working-state/progress fixes. Not an unseen test set; preserve first-run results and do not report a general capability uplift.",
+  "harness_revisions": {
+    "multi_swe_bench": "24f493f8a103e72312ded4f6b9c89f081d69cb09",
+    "swebench": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+    "swebench_tasks": "3d07b464b7b311a0cbfb5ed5b2d8a3b96f84a33d",
+    "harbor": "0.25.0"
+  },
+  "agent": {
+    "model": "deepseek-flash",
+    "thinking": "enabled",
+    "reasoning_effort": "high",
+    "no_delegate": true,
+    "max_model_calls": 100,
+    "max_tokens": 200000,
+    "max_steps": 100,
+    "timeout_sec": 1200,
+    "max_output_tokens": 8192,
+    "provider_retries": 0,
+    "context_strategy": "bounded",
+    "context_budget": 6000,
+    "runtime_budget_guidance": true,
+    "runtime_progress_guidance": true,
+    "working_analysis_carryover": true
+  },
+  "frozen_at_utc": "2026-11-08T12:58:22.989269+00:00",
+  "tasks": [
+    {
+      "id": "zeromicro__go-zero-1969",
+      "language": "go",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "dataset_file": "zeromicro__go-zero_dataset.jsonl",
+      "repository": "zeromicro/go-zero",
+      "base_commit": "af05219b70c5e18542ebb499b18a1dff6ffacc6d",
+      "image": "mswebench/zeromicro_m_go-zero:pr-1969",
+      "image_digest": "mswebench/zeromicro_m_go-zero@sha256:181ff4dbd1db4963e7dea3cb61357489289693698a89a62c5feef116f98aa45f",
+      "workspace": "/home/go-zero",
+      "record_sha256": "546df346bd82c1e9b9c71c4480d56a0c85287de3a7296219e6d8d6bd7ac43e4f",
+      "f2p_count": 1,
+      "p2p_count": 1370
+    },
+    {
+      "id": "expressjs__express-3695",
+      "language": "javascript",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "dataset_file": "expressjs__express_dataset.jsonl",
+      "repository": "expressjs/express",
+      "base_commit": "3ed5090ca91f6a387e66370d57ead94d886275e1",
+      "image": "mswebench/expressjs_m_express:pr-3695",
+      "image_digest": "mswebench/expressjs_m_express@sha256:ccca4c848c058444794b29ec3ec9136922392ae15fe3c89bf5c1f27346977857",
+      "workspace": "/home/express",
+      "record_sha256": "599f07734253589daca3a32481d803ad5425db1a71449420a4e50c64bebc9307",
+      "f2p_count": 2,
+      "p2p_count": 850
+    }
+  ]
+}

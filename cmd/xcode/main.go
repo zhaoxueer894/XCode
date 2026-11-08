@@ -15,7 +15,8 @@ import (
 	"path/filepath" // 生成事件日志的默认路径并创建父目录。
 	"runtime"       // 区分 Windows ACL 与 Unix 权限位的检查方式。
 	"strings"       // 把多个位置参数重新拼成完整用户提示。
-	"time"          // 表示整次运行的超时时间。
+	"sync"
+	"time" // 表示整次运行的超时时间。
 
 	"xcode/internal/artifactstore" // 把普通 CLI 的完整工具结果保存到本地状态目录。
 	"xcode/internal/checkpoint"    // 写前快照的保存与恢复。
@@ -26,6 +27,7 @@ import (
 	"xcode/internal/memory"        // L1 会话笔记与 L2 项目记忆。
 	"xcode/internal/model"         // 使用不需要 API Key 的 Demo Model。
 	"xcode/internal/model/bailian" // 提供阿里云百炼的流式模型适配器。
+	"xcode/internal/model/deepseek"
 	"xcode/internal/policy"
 	"xcode/internal/recovery" // 恢复分析与副作用对账。
 	"xcode/internal/sandbox"  // 策略引擎与运行 Mode。
@@ -38,82 +40,227 @@ const (
 )
 
 // main 是 xcode CLI 的程序入口。
-func main() {
+func main() { check(runCLI(os.Args[1:])) }
+
+// runCLI returns before main exits, so failure paths flush logs and result files.
+func runCLI(args []string) (runErr error) {
+	// Batch callers can opt out of ambient configuration and .env loading.
+	isolated := false
+	for _, arg := range args {
+		if arg == "--" {
+			break
+		}
+		if arg == "--isolated" || arg == "--isolated=true" {
+			isolated = true
+		}
+		if arg == "--isolated=false" {
+			isolated = false
+		}
+	}
 	// 每次启动都从当前项目根目录读取 .env；文件不存在时仍允许使用离线 Demo 模式。
-	check(loadDotEnv(".env"))
+	if !isolated {
+		if err := loadDotEnv(".env"); err != nil {
+			return err
+		}
+	}
 	// eval 使用独立 FlagSet
-	if len(os.Args) > 1 && os.Args[1] == "eval" {
+	if len(args) > 0 && args[0] == "eval" {
 		evalContext, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
-		check(runEval(evalContext, os.Args[2:]))
-		return
+		if err := runEval(evalContext, args[1:]); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// 长任务故障评测子命令（三策略对照 + replay）。
-	if len(os.Args) > 1 && os.Args[1] == "eval-fault" {
+	if len(args) > 0 && args[0] == "eval-fault" {
 		faultContext, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
-		check(runFaultEval(faultContext, os.Args[2:]))
-		return
+		if err := runFaultEval(faultContext, args[1:]); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// 查看与恢复写前快照的独立子命令。
-	if len(os.Args) > 1 && os.Args[1] == "checkpoints" {
-		check(runCheckpoints(os.Args[2:]))
-		return
+	if len(args) > 0 && args[0] == "checkpoints" {
+		if err := runCheckpoints(args[1:]); err != nil {
+			return err
+		}
+		return nil
 	}
-	if len(os.Args) > 1 && os.Args[1] == "restore" {
-		check(runRestore(os.Args[2:]))
-		return
+	if len(args) > 0 && args[0] == "restore" {
+		if err := runRestore(args[1:]); err != nil {
+			return err
+		}
+		return nil
 	}
-	if len(os.Args) > 1 && os.Args[1] == "policy" {
-		check(runPolicyCheck(os.Args[2:]))
-		return
+	if len(args) > 0 && args[0] == "policy" {
+		if err := runPolicyCheck(args[1:]); err != nil {
+			return err
+		}
+		return nil
 	}
-	if len(os.Args) > 1 && os.Args[1] == "journal" {
-		check(runJournal(os.Args[2:]))
-		return
+	if len(args) > 0 && args[0] == "journal" {
+		if err := runJournal(args[1:]); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// 预扫描 --workspace 以定位配置文件，配置值作为 flag 默认值。
 	presetWorkspace := "."
-	for i, arg := range os.Args {
-		if arg == "--workspace" && i+1 < len(os.Args) {
-			presetWorkspace = os.Args[i+1]
+	for i, arg := range args {
+		if arg == "--workspace" && i+1 < len(args) {
+			presetWorkspace = args[i+1]
 		}
 		if strings.HasPrefix(arg, "--workspace=") {
 			presetWorkspace = strings.TrimPrefix(arg, "--workspace=")
 		}
 	}
-	appConfig, configErr := config.Load(presetWorkspace)
+	appConfig := config.Defaults()
+	var configErr error
+	if !isolated {
+		appConfig, configErr = config.Load(presetWorkspace)
+	}
 	if configErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: load config: %v\n", configErr)
 	}
 
+	flags := flag.NewFlagSet("xcode", flag.ContinueOnError)
+	flags.BoolVar(&isolated, "isolated", isolated, "ignore .env and user/project config; use flags and process environment")
 	// 定义可选命令行参数；返回的是指针，调用 flag.Parse 后再解引用读取值。
 	// 默认值来自配置文件（flag 显式传入时覆盖配置）。
-	workspace := flag.String("workspace", presetWorkspace, "workspace root")
-	maxSteps := flag.Int("max-steps", appConfig.MaxSteps, "maximum model iterations")
-	provider := flag.String("provider", appConfig.Provider, "model provider: demo or bailian")
-	timeout := flag.Duration("timeout", appConfig.Timeout, "maximum duration of one run")
-	artifactDir := flag.String("artifact-dir", ".xcode-state/artifacts", "directory for full tool result artifacts")
-	eventLog := flag.String("event-log", "", "JSONL event log path (default .xcode-state/logs/run-<timestamp>.jsonl)")
-	verbose := flag.Bool("verbose", false, "also print full JSONL events to stderr")
-	mode := flag.String("mode", appConfig.Mode, "capability mode: plan, workspace-write or full-access")
-	checkpointDir := flag.String("checkpoint-dir", "", "directory for pre-write checkpoints")
-	maxTokens := flag.Int("max-tokens", appConfig.MaxTokens, "maximum total tokens per run (0 = unlimited)")
-	doomLoopLimit := flag.Int("doom-loop-limit", 3, "stop when the same tool call repeats this many times in a row")
-	contextStrategy := flag.String("context-strategy", appConfig.ContextStrategy, "context strategy: none, sliding, handoff or compaction")
-	contextBudget := flag.Int("context-budget", appConfig.ContextBudget, "estimated-token budget before compaction")
-	sandboxBackend := flag.String("sandbox", appConfig.Sandbox, "command backend: host, docker or docker-wsl")
-	sandboxImage := flag.String("sandbox-image", "alpine:3.20", "docker image used by the docker sandbox backend")
-	policyPath := flag.String("policy", "", "policy rules file (default <workspace>/.xcode/policy.json)")
-	resumeFlag := flag.Bool("resume", false, "resume the last unfinished turn from the recovery log")
-	contractFlag := flag.String("contract", "", "task contract JSON enabling the completion gate (goal, verify_commands, optional review)")
-	typedShadow := flag.Bool("typed-shadow", false, "mount the typed shadow classifier (local or jev per .xcode/config) alongside decision-gated compaction; the jev backend makes real systemone calls only when enabled")
-	flag.Parse()
+	workspace := flags.String("workspace", presetWorkspace, "workspace root")
+	maxSteps := flags.Int("max-steps", appConfig.MaxSteps, "maximum model iterations")
+	provider := flags.String("provider", appConfig.Provider, "model provider: demo, bailian or deepseek")
+	timeout := flags.Duration("timeout", appConfig.Timeout, "maximum duration of one run")
+	artifactDir := flags.String("artifact-dir", ".xcode-state/artifacts", "directory for full tool result artifacts")
+	eventLog := flags.String("event-log", "", "JSONL event log path (default .xcode-state/logs/run-<timestamp>.jsonl)")
+	verbose := flags.Bool("verbose", false, "also print full JSONL events to stderr")
+	mode := flags.String("mode", appConfig.Mode, "capability mode: plan, workspace-write or full-access")
+	checkpointDir := flags.String("checkpoint-dir", "", "directory for pre-write checkpoints")
+	maxTokens := flags.Int("max-tokens", appConfig.MaxTokens, "maximum total tokens per run (0 = unlimited)")
+	doomLoopLimit := flags.Int("doom-loop-limit", 3, "stop when the same tool call repeats this many times in a row")
+	contextStrategy := flags.String("context-strategy", appConfig.ContextStrategy, "context strategy: bounded, none, sliding, handoff, compaction or decision-gated")
+	contextBudget := flags.Int("context-budget", appConfig.ContextBudget, "estimated-token budget before compaction")
+	sandboxBackend := flags.String("sandbox", appConfig.Sandbox, "command backend: host, docker or docker-wsl")
+	sandboxImage := flags.String("sandbox-image", appConfig.SandboxImage, "docker image used by the docker sandbox backend")
+	policyPath := flags.String("policy", "", "policy rules file (default <workspace>/.xcode/policy.json)")
+	resumeFlag := flags.Bool("resume", false, "resume the last unfinished turn from the recovery log")
+	contractFlag := flags.String("contract", "", "task contract JSON enabling the completion gate (goal, verify_commands, optional review)")
+	typedShadow := flags.Bool("typed-shadow", false, "mount the typed shadow classifier (local or jev per .xcode/config) alongside decision-gated compaction; the jev backend makes real systemone calls only when enabled")
+	nonInteractive := flags.Bool("non-interactive", false, "never prompt; deny commands requiring approval unless policy explicitly allows them")
+	noDelegate := flags.Bool("no-delegate", false, "disable subagents for single-agent comparisons")
+	maxModelCalls := flags.Int("max-model-calls", 0, "shared Generate-call limit, including subagents and summaries (0 = unlimited)")
+	resultFile := flags.String("result-file", "", "write a JSON run result on completion or failure; not a correctness grade")
+	promptFile := flags.String("prompt-file", "", "read the task from a UTF-8 file instead of positional arguments")
+	providerRetries := flags.Int("provider-retries", 2, "additional provider HTTP attempts (0 disables retries)")
+	modelConfig := flags.String("model-config", "", "external DeepSeek credential/config text file; contents are never copied into reports")
+	modelKeyIndex := flags.Int("model-key-index", 0, "zero-based API key index in model-config")
+	thinking := flags.String("thinking", "enabled", "DeepSeek thinking mode: enabled or disabled")
+	reasoningEffort := flags.String("reasoning-effort", "high", "DeepSeek reasoning effort: low, high or max")
+	maxOutputTokens := flags.Int("max-output-tokens", 0, "DeepSeek per-request output limit (0 = 8192)")
+	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
+		return err
+	}
+	providerExplicit := false
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "provider" {
+			providerExplicit = true
+		}
+	})
+	if *modelConfig != "" && !providerExplicit {
+		*provider = "deepseek"
+	}
 	// 位置参数为空时进入交互模式；有参数时为一次性命令。
-	interactive := flag.NArg() == 0
+	interactive := flags.NArg() == 0 && *promptFile == ""
+	record := newRunRecord(runRecordConfig{
+		Workspace: *workspace, Provider: *provider, Mode: *mode, Sandbox: *sandboxBackend,
+		ContextStrategy: *contextStrategy, MaxSteps: *maxSteps, MaxTokens: *maxTokens,
+		MaxModelCalls: *maxModelCalls, Timeout: timeout.String(), NoDelegate: *noDelegate,
+		NonInteractive: *nonInteractive,
+	})
+	var budget *harness.ModelBudget
+	defer func() {
+		if budget != nil {
+			record.Model = budget.Snapshot()
+		}
+		record.finish(runErr)
+		if *resultFile != "" {
+			runErr = errors.Join(runErr, writeRunRecord(*resultFile, record))
+		}
+	}()
+	record.Config.ContextBudget, record.Config.SandboxImage = *contextBudget, *sandboxImage
+	record.Config.Isolated = isolated
+	record.Config.DoomLoopLimit, record.Config.ProviderRetries = *doomLoopLimit, *providerRetries
+	record.Config.ModelKeyIndex = *modelKeyIndex
+	if *resultFile != "" {
+		if _, err := os.Lstat(*resultFile); err == nil {
+			return fmt.Errorf("result-file already exists: %s", *resultFile)
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
+	if *timeout <= 0 || *maxSteps <= 0 || *maxTokens < 0 || *maxModelCalls < 0 || *providerRetries < 0 {
+		return fmt.Errorf("timeout and max-steps must be positive; token and model-call limits must not be negative")
+	}
+	if (*nonInteractive || *resultFile != "") && (interactive || *resumeFlag) {
+		return fmt.Errorf("non-interactive/result-file runs require a task and do not support REPL or resume")
+	}
+	if *resultFile != "" && !*nonInteractive {
+		return fmt.Errorf("result-file requires --non-interactive")
+	}
+	if *nonInteractive && configErr != nil {
+		return configErr
+	}
+	if *modelConfig != "" && !strings.EqualFold(*provider, "deepseek") {
+		return fmt.Errorf("model-config is supported with provider deepseek")
+	}
+	if *typedShadow && *nonInteractive {
+		return fmt.Errorf("typed-shadow is not yet accounted for by batch run budgets; disable it for non-interactive runs")
+	}
+	prompt := strings.Join(flags.Args(), " ")
+	if *promptFile != "" {
+		if flags.NArg() != 0 {
+			return fmt.Errorf("prompt-file and positional task are mutually exclusive")
+		}
+		data, err := os.ReadFile(*promptFile)
+		if err != nil {
+			return fmt.Errorf("read prompt: %w", err)
+		}
+		prompt = strings.TrimSpace(string(data))
+		if prompt == "" {
+			return fmt.Errorf("prompt file is empty")
+		}
+	}
+	record.PromptHash = hashRunBytes([]byte(prompt))
+	version, err := executableHarnessVersion()
+	if err != nil {
+		return err
+	}
+	record.BinaryVersion = version
+	if strings.EqualFold(*provider, "bailian") {
+		record.Config.Model = envOrDefault("DASHSCOPE_MODEL", defaultBailianModel)
+		record.Config.Endpoint = safeEndpoint(envOrDefault("DASHSCOPE_BASE_URL", defaultBailianBaseURL))
+	}
+	var deepseekConfig deepseek.Config
+	if strings.EqualFold(*provider, "deepseek") {
+		if *reasoningEffort != "low" && *reasoningEffort != "high" && *reasoningEffort != "max" {
+			return fmt.Errorf("reasoning-effort must be low, high or max")
+		}
+		deepseekConfig, err = deepseekSettings(*modelConfig, *modelKeyIndex, *thinking, *reasoningEffort, *providerRetries, *maxOutputTokens)
+		if err != nil {
+			return err
+		}
+		record.Config.Model, record.Config.Endpoint = deepseekConfig.Model, safeEndpoint(deepseekConfig.BaseURL)
+		record.Config.Thinking, record.Config.ReasoningEffort = deepseekConfig.Thinking, deepseekConfig.ReasoningEffort
+		record.Config.MaxOutputTokens = deepseekConfig.MaxOutputTokens
+	}
 
 	// Index 建立、工具执行和模型请求共享同一套 Ctrl+C 与超时信号。
 	signalContext, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -123,29 +270,58 @@ func main() {
 
 	// 完整工具结果保存在本地 Artifact Store，模型消息只接收受限预览。
 	artifacts, err := artifactstore.NewFileStore(*artifactDir)
-	check(err)
+	if err != nil {
+		return err
+	}
 	// 三种只读工具共享 Workspace Index 和 ReadSet，保证路径与忽略规则一致。
 	readOnlyTools, err := tools.NewReadOnlySet(ctx, *workspace, artifacts)
-	check(err)
-
+	if err != nil {
+		return err
+	}
+	record.Config.Workspace = readOnlyTools.WorkspaceRoot()
 	// 根据 --provider 选择模型；百炼密钥只从当前进程环境变量读取。
-	selectedModel, err := buildModel(*provider)
-	check(err)
-
+	var selectedModel harness.Model
+	if strings.EqualFold(*provider, "deepseek") {
+		selectedModel, err = deepseek.New(deepseekConfig)
+	} else {
+		selectedModel, err = buildModelWithRetryLimit(*provider, *providerRetries)
+	}
+	if err != nil {
+		return err
+	}
 	// 完整事件按 JSONL 落盘供事后排查；终端默认只渲染每步的极简进度行。
 	logPath := strings.TrimSpace(*eventLog)
 	if logPath == "" {
 		logPath = filepath.Join(".xcode-state", "logs", "run-"+time.Now().UTC().Format("20060102T150405.000000000Z")+".jsonl")
 	}
-	check(os.MkdirAll(filepath.Dir(logPath), 0o700))
+	record.EventLog, _ = filepath.Abs(logPath)
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
+		return err
+	}
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	check(err)
-	defer logFile.Close()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := errors.Join(logFile.Sync(), logFile.Close()); closeErr != nil {
+			if *nonInteractive {
+				runErr = errors.Join(runErr, closeErr)
+			} else {
+				fmt.Fprintln(os.Stderr, "warning: close event log:", closeErr)
+			}
+		}
+	}()
 	fmt.Fprintf(os.Stderr, "[xcode] provider=%s event log: %s\n", *provider, logPath)
 
 	// 日志写入属于诊断路径：记录首个错误并在结束时提示，不让它中断 Agent 主流程。
 	var logWriteErr error
+	var sinkMu sync.Mutex
 	sink := harness.EventSinkFunc(func(event harness.Event) {
+		sinkMu.Lock()
+		defer sinkMu.Unlock()
+		if event.Kind == harness.ApprovalResolved {
+			record.Approvals++
+		}
 		data, encodeErr := json.Marshal(event)
 		if encodeErr != nil {
 			if logWriteErr == nil {
@@ -162,6 +338,9 @@ func main() {
 		}
 		writeCompactEvent(os.Stderr, event)
 	})
+	budget = harness.NewModelBudget(*maxModelCalls, *maxTokens, sink)
+	summaryModel := budget.Wrap(selectedModel, "summary")
+	selectedModel = budget.Wrap(selectedModel, "agent")
 
 	// 创建 delegate 工具并注册到 Registry。
 	// factory 使用延迟引用打破 Agent↔Executor 循环依赖。
@@ -169,9 +348,13 @@ func main() {
 	var registryRef *harness.Registry
 	var engineRef *policy.Engine
 	var checkpointsRef *checkpoint.Store
+	var approver executor.Approver
+	if !*nonInteractive {
+		approver = newTerminalApprover()
+	}
 	delegate := harness.NewDelegate(
 		func(ctx context.Context, role, prompt string, maxSteps int, subSink harness.EventSink) (string, error) {
-			subExecutor, err := executor.New(registryRef, engineRef, nil, checkpointsRef, subSink)
+			subExecutor, err := executor.New(registryRef, engineRef, approver, checkpointsRef, subSink)
 			if err != nil {
 				return "", err
 			}
@@ -184,36 +367,54 @@ func main() {
 
 	// 写入与执行工具一并注册；加入 delegate 后重建。
 	baseTools := append(readOnlyTools.Tools(), readOnlyTools.WriteTools()...)
-	allTools := append(baseTools, delegate)
+	allTools := baseTools
+	if !*noDelegate {
+		allTools = append(allTools, delegate)
+	}
 	registry, err := harness.NewRegistry(allTools...)
-	check(err)
-
+	if err != nil {
+		return err
+	}
 	// 策略引擎、写前快照仓库与交互审批组成统一执行管线。
 	engine, err := policy.NewEngine(policy.Mode(*mode))
-	check(err)
+	if err != nil {
+		return err
+	}
 	// 加载可选的项目级规则文件；默认位于工作区 .xcode/policy.json。
 	resolvedPolicyPath := *policyPath
 	if resolvedPolicyPath == "" {
 		resolvedPolicyPath = filepath.Join(readOnlyTools.WorkspaceRoot(), ".xcode", "policy.json")
 	}
 	ruleSet, rulesErr := policy.LoadRulesFile(resolvedPolicyPath)
-	check(rulesErr)
+	if err := rulesErr; err != nil {
+		return err
+	}
 	engine.SetRules(ruleSet)
+	if ruleSet != nil {
+		data, _ := json.Marshal(ruleSet)
+		record.Config.PolicyHash = hashRunBytes(data)
+	}
 	if *checkpointDir == "" {
 		*checkpointDir = filepath.Join(readOnlyTools.WorkspaceRoot(), ".xcode-state", "checkpoints")
 	}
 	checkpoints, err := checkpoint.NewStore(*checkpointDir, readOnlyTools.WorkspaceRoot())
-	check(err)
-	secure, err := executor.New(registry, engine, newTerminalApprover(), checkpoints, sink)
-	check(err)
+	if err != nil {
+		return err
+	}
+	secure, err := executor.New(registry, engine, approver, checkpoints, sink)
+	if err != nil {
+		return err
+	}
 	registryRef = registry
 	engineRef = engine
 	checkpointsRef = checkpoints
 
 	// ToolCall 状态 journal，与事件日志同目录层次，便于对账。
 	journal, journalErr := executor.OpenJournal(filepath.Join(readOnlyTools.WorkspaceRoot(), ".xcode-state", "journal", "run-"+time.Now().UTC().Format("20060102T150405.000000000Z")+".jsonl"))
-	check(journalErr)
-	defer journal.Close()
+	if err := journalErr; err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, journal.Close()) }()
 	secure.SetJournal(journal)
 
 	// 只读工具的 ReadSet 使用共享纪元，压缩后同范围读取会重新注入全文。
@@ -225,21 +426,29 @@ func main() {
 	switch backendChoice {
 	case "", "host":
 	case "docker":
-		check(sandbox.ProbeDocker(ctx, false))
+		if err := sandbox.ProbeDocker(ctx, false); err != nil {
+			return err
+		}
 		readOnlyTools.SetSandbox(sandbox.DockerBackend{Image: *sandboxImage})
 	case "docker-wsl":
-		check(sandbox.ProbeDocker(ctx, true))
+		if err := sandbox.ProbeDocker(ctx, true); err != nil {
+			return err
+		}
 		readOnlyTools.SetSandbox(sandbox.DockerBackend{Image: *sandboxImage, ViaWSL: true})
 	default:
-		check(fmt.Errorf("unknown sandbox backend %q: choose host, docker or docker-wsl", *sandboxBackend))
+		if err := fmt.Errorf("unknown sandbox backend %q: choose host, docker or docker-wsl", *sandboxBackend); err != nil {
+			return err
+		}
 	}
 	manager, mgrErr := contextmgr.NewManager(contextmgr.Strategy(*contextStrategy), *contextBudget, epoch)
-	check(mgrErr)
+	if err := mgrErr; err != nil {
+		return err
+	}
 	notes := memory.NewSessionStore(filepath.Join(readOnlyTools.WorkspaceRoot(), ".xcode-state", "memory", "session-notes.json"))
 	manager.SetNoteRecorder(notes)
 	// compaction 策略需要模型摘要器；demo 模型不具备总结能力，保持 nil 即回退占位符。
 	if !strings.EqualFold(*provider, "demo") {
-		selected := selectedModel
+		selected := summaryModel
 		manager.SetSummarizer(func(ctx context.Context, oldText string) (string, error) {
 			response, err := selected.Generate(ctx, []harness.Message{
 				{Role: "user", Content: "请把下面这段 Agent 工作历史总结成不超过 200 字的要点，保留目标、已改文件、验证结果、失败与下一步：\n" + oldText},
@@ -259,7 +468,9 @@ func main() {
 		if strings.TrimSpace(backend) == "" {
 			backend = "local"
 		}
-		check(mountTypedShadow(manager, backend, *provider, selectedModel, appConfig.TypedClassifierEndpoint, appConfig.TypedClassifierModel, appConfig.TypedClassifierKeyEnvVar, false))
+		if err := mountTypedShadow(manager, backend, *provider, selectedModel, appConfig.TypedClassifierEndpoint, appConfig.TypedClassifierModel, appConfig.TypedClassifierKeyEnvVar, false); err != nil {
+			return err
+		}
 	}
 
 	// 组装选定的 Model、统一执行入口、最大步数和事件输出端。
@@ -282,20 +493,25 @@ func main() {
 	}
 	if trimmed := strings.TrimSpace(prelude.String()); trimmed != "" {
 		agent.SetProjectMemory(trimmed)
+		record.Config.PreludeHash = hashRunBytes([]byte(trimmed))
 	}
 	agent.SetContextManager(manager)
 
 	// 轮次恢复日志在全部装配完成后挂载；一次性与交互模式共用同一份日志文件。
 	turnLog, turnLogErr := harness.NewTurnLog(turnLogPath(readOnlyTools.WorkspaceRoot()))
-	check(turnLogErr)
-	defer turnLog.Close()
+	if err := turnLogErr; err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, turnLog.Close()) }()
 	agent.SetTurnLog(turnLog)
 
 	// 一次性恢复——从最后安全边界续跑被中断的轮次，不重新提交用户任务。
 	if *resumeFlag {
 		options := harness.RunOptions{MaxSteps: *maxSteps, MaxTotalTokens: *maxTokens, DoomLoopLimit: *doomLoopLimit}
-		check(runResume(ctx, agent, readOnlyTools.WorkspaceRoot(), checkpoints, strings.TrimSpace(prelude.String()), options))
-		return
+		if err := runResume(ctx, agent, readOnlyTools.WorkspaceRoot(), checkpoints, strings.TrimSpace(prelude.String()), options); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// 交互模式——无位置参数时进入 REPL 多轮对话。
@@ -312,15 +528,14 @@ func main() {
 				time.Since(since).Round(time.Second))
 		}
 		// 进入 REPL 循环。
-		check(runInteractive(ctx, session, replConfig{
+		return runInteractive(ctx, session, replConfig{
 			Provider:  *provider,
 			Model:     envOrDefault("DASHSCOPE_MODEL", "demo"),
 			Mode:      *mode,
 			Workspace: readOnlyTools.WorkspaceRoot(),
 			Timeout:   *timeout,
 			Engine:    engine,
-		}))
-		return
+		})
 	}
 
 	// flag.Args 取得用户任务的全部单词，再用空格还原成一个 prompt。
@@ -329,21 +544,35 @@ func main() {
 	// 模型在验证后再次修改文件时，缓存证据自动失效，门禁会在新版本上重新取证。
 	if strings.TrimSpace(*contractFlag) != "" {
 		contract, contractErr := loadContract(*contractFlag)
-		check(contractErr)
+		if err := contractErr; err != nil {
+			return err
+		}
 		options.Contract = contract
+		data, _ := json.Marshal(contract)
+		record.Config.ContractHash = hashRunBytes(data)
+		if *noDelegate && contract.Review {
+			return fmt.Errorf("contract review requires delegate; remove --no-delegate or disable review")
+		}
 		options.WorkspaceFingerprint = wireWorkspaceFingerprint(readOnlyTools.WorkspaceRoot())
 		fmt.Fprintf(os.Stderr, "[xcode] completion gate enabled: %d verify command(s), review=%t\n",
 			len(contract.VerifyCommands), contract.Review)
 	}
-	result, runErr := agent.RunWithOptions(ctx, strings.Join(flag.Args(), " "), options)
+	result, agentErr := agent.RunWithOptions(ctx, prompt, options)
+	record.Answer, record.StopReason, record.Steps = result.Answer, result.StopReason, result.Steps
 	// 日志写入失败只提示，不掩盖也不替代 Agent 本身的运行结果。
 	if logWriteErr != nil {
 		fmt.Fprintln(os.Stderr, "warning: event log write failed:", logWriteErr)
 	}
-	check(runErr)
+	if *nonInteractive {
+		agentErr = errors.Join(agentErr, logWriteErr, journal.Err(), turnLog.Err())
+	}
+	if agentErr != nil {
+		return agentErr
+	}
 	// 停止原因写 stderr 进度流，最终答案写 stdout，两条输出职责分离。
 	fmt.Fprintf(os.Stderr, "[xcode] stop reason: %s\n", result.StopReason)
 	fmt.Println(result.Answer)
+	return nil
 }
 
 // writeCompactEvent 把一条运行事件渲染成单行极简进度；流式增量等高频事件不输出。
@@ -400,17 +629,29 @@ func compactLine(text string, maxRunes int) string {
 
 // buildModel 根据 provider 名称创建模型实现，并校验百炼所需的运行配置。
 func buildModel(provider string) (harness.Model, error) {
+	return buildModelWithRetryLimit(provider, 2)
+}
+
+func buildModelWithRetryLimit(provider string, retries int) (harness.Model, error) {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "demo":
 		return model.Demo{}, nil
 	case "bailian":
 		return bailian.New(bailian.Config{
-			APIKey:  strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY")),
-			BaseURL: envOrDefault("DASHSCOPE_BASE_URL", defaultBailianBaseURL),
-			Model:   envOrDefault("DASHSCOPE_MODEL", defaultBailianModel),
+			APIKey:         strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY")),
+			BaseURL:        envOrDefault("DASHSCOPE_BASE_URL", defaultBailianBaseURL),
+			Model:          envOrDefault("DASHSCOPE_MODEL", defaultBailianModel),
+			MaxRetries:     retries,
+			DisableRetries: retries == 0,
 		})
+	case "deepseek":
+		settings, err := deepseekSettings("", 0, "enabled", "high", retries, 8192)
+		if err != nil {
+			return nil, err
+		}
+		return deepseek.New(settings)
 	default:
-		return nil, fmt.Errorf("unsupported provider %q: choose demo or bailian", provider)
+		return nil, fmt.Errorf("unsupported provider %q: choose demo, bailian or deepseek", provider)
 	}
 }
 
@@ -438,6 +679,9 @@ func loadDotEnv(path string) error {
 
 	// 白名单避免把项目文件中的任意名称都注入进进程环境。
 	allowed := map[string]struct{}{
+		"DEEPSEEK_API_KEY":   {},
+		"DEEPSEEK_BASE_URL":  {},
+		"DEEPSEEK_MODEL":     {},
 		"DASHSCOPE_API_KEY":  {},
 		"DASHSCOPE_BASE_URL": {},
 		"DASHSCOPE_MODEL":    {},

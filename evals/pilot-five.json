@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "execution_environment": {"cpus": 2, "memory_mb": 4096, "go_env": {"GOMAXPROCS": "2", "GOFLAGS": "-p=2"}, "reason": "Align pre-cgroup-aware Go runtimes and package parallelism to the actual container CPU quota; tests and upstream graders are unchanged."},
+  "selection_policy": "Two Go repositories and Express: lowest PR number with non-empty official F2P set and published image; Python: sole Flask Verified issue and newest Requests Verified issue. Frozen before grading or model runs. No replacement after outcomes.",
+  "harness_revisions": {
+    "multi_swe_bench": "24f493f8a103e72312ded4f6b9c89f081d69cb09",
+    "swebench": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+    "swebench_tasks": "3d07b464b7b311a0cbfb5ed5b2d8a3b96f84a33d",
+    "harbor": "0.25.0"
+  },
+  "agent": {
+    "model": "deepseek-flash",
+    "thinking": "enabled",
+    "reasoning_effort": "high",
+    "no_delegate": true,
+    "max_model_calls": 100,
+    "max_tokens": 200000,
+    "max_steps": 100,
+    "timeout_sec": 1200,
+    "max_output_tokens": 8192,
+    "provider_retries": 0
+  },
+  "tasks": [
+    {
+      "id": "grpc__grpc-go-2630",
+      "language": "go",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "dataset_file": "grpc__grpc-go_dataset.jsonl",
+      "repository": "grpc/grpc-go",
+      "base_commit": "5878d965b2234619fe67d256d0cd582553e7fff1",
+      "image": "mswebench/grpc_m_grpc-go:pr-2630",
+      "image_digest": "mswebench/grpc_m_grpc-go@sha256:0d74d08c3f287551f625c20140c09898fd606cd7fc443e03394b11c79825e133",
+      "workspace": "/home/grpc-go",
+      "record_sha256": "d491c7f43c7273cd5126f683119db91518c86072169891050db8516d65071538",
+      "f2p_count": 2,
+      "p2p_count": 202
+    },
+    {
+      "id": "zeromicro__go-zero-1783",
+      "language": "go",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "dataset_file": "zeromicro__go-zero_dataset.jsonl",
+      "repository": "zeromicro/go-zero",
+      "base_commit": "ba8ac974aaa16ebcf00f17c653d131a3b6d74a30",
+      "image": "mswebench/zeromicro_m_go-zero:pr-1783",
+      "image_digest": "mswebench/zeromicro_m_go-zero@sha256:1906101efdf56d68b25c223ab1ee42541d08fd165885f356c2cdb877e919c332",
+      "workspace": "/home/go-zero",
+      "record_sha256": "338d7ea8e342be5e30b4e069547ea001a057bf97872d606be970439dfbebec51",
+      "f2p_count": 2,
+      "p2p_count": 1184
+    },
+    {
+      "id": "expressjs__express-3495",
+      "language": "javascript",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "dataset_file": "expressjs__express_dataset.jsonl",
+      "repository": "expressjs/express",
+      "base_commit": "8da51108e7bb501344c537d3f1f846a7477ae329",
+      "image": "mswebench/expressjs_m_express:pr-3495",
+      "image_digest": "mswebench/expressjs_m_express@sha256:a419b43119d0ae9696d059c8e1ec55ecb6379c82a9dae5e71bbbdb5e18f7eb47",
+      "workspace": "/home/express",
+      "record_sha256": "d6cc0ec421f94b39badbc5b6b0ede71a7813333824c055e383825302acb76329",
+      "f2p_count": 2,
+      "p2p_count": 854
+    },
+    {
+      "id": "pallets__flask-5014",
+      "language": "python",
+      "dataset": "SWE-bench/SWE-bench_Verified",
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "repository": "pallets/flask",
+      "base_commit": "7ee9ceb71e868944a46e1ff00b506772a53a4f1d",
+      "image": "swebench/sweb.eval.x86_64.pallets_1776_flask-5014:latest",
+      "image_digest": "swebench/sweb.eval.x86_64.pallets_1776_flask-5014@sha256:bde4fbdafa36141d4396944da88ec37aabdef612ed36920090675bccd0ca5d72",
+      "workspace": "/testbed",
+      "record_sha256": "27294f70c88f00c5901fcbafbcc8ca47d715ca3f87117e9905b9d5facb3b80aa",
+      "f2p_count": 1,
+      "p2p_count": 59
+    },
+    {
+      "id": "psf__requests-6028",
+      "language": "python",
+      "dataset": "SWE-bench/SWE-bench_Verified",
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "repository": "psf/requests",
+      "base_commit": "0192aac24123735b3eaf9b08df46429bb770c283",
+      "image": "swebench/sweb.eval.x86_64.psf_1776_requests-6028:latest",
+      "image_digest": "swebench/sweb.eval.x86_64.psf_1776_requests-6028@sha256:639088346355ea7076bc6faf2eadb23b1e1f1ed4f34b291e843061b2fc87cbe2",
+      "workspace": "/testbed",
+      "record_sha256": "8019fed56f13724e01d77c8a0fe9225eb3c9eaa7866763c5deb214749406d98e",
+      "f2p_count": 2,
+      "p2p_count": 185
+    }
+  ]
+}

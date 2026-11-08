@@ -7,3 +7,5 @@ coverage.out
 bin/
 .xcode-state/
 .eval/
+__pycache__/
+*.pyc

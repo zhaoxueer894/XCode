@@ -1,0 +1,18 @@
+{
+  "rules": [
+    {
+      "id": "go-tests",
+      "tool": "exec",
+      "command_prefix": ["go", "test"],
+      "decision": "allow",
+      "reason": "Explicitly allow Go verification in unattended workspace-write runs."
+    },
+    {
+      "id": "go-vet",
+      "tool": "exec",
+      "command_prefix": ["go", "vet"],
+      "decision": "allow",
+      "reason": "Explicitly allow Go static checks."
+    }
+  ]
+}
