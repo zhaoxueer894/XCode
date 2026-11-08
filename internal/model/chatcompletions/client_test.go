@@ -1,4 +1,4 @@
-package bailian
+package chatcompletions
 
 // 本文件使用内存中的假 HTTPS 传输验证百炼协议，不访问网络或读取真实 API Key。
 
@@ -201,7 +201,7 @@ func TestGenerateDoesNotRetryBrokenStartedStream(t *testing.T) {
 	client := newTestClient(t, transport, 2)
 
 	_, err := client.Generate(context.Background(), nil, nil, nil)
-	if err == nil || !strings.Contains(err.Error(), "read bailian SSE stream") {
+	if err == nil || !strings.Contains(err.Error(), "read chat completions SSE stream") {
 		t.Fatalf("error = %v, want stream read error", err)
 	}
 	if calls.Load() != 1 {

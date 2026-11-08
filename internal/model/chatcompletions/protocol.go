@@ -1,13 +1,19 @@
-// Package bailian 实现阿里云百炼 OpenAI-compatible Chat Completions Provider。
-package bailian
+package chatcompletions
 
 // chatRequest 表示发送给百炼 /chat/completions 的请求体。
 type chatRequest struct {
-	Model         string        `json:"model"`           // 百炼模型 ID，例如 qwen-plus。
-	Messages      []chatMessage `json:"messages"`        // 当前完整消息历史。
-	Tools         []chatTool    `json:"tools,omitempty"` // 可用本地工具声明。
-	Stream        bool          `json:"stream"`          // true 表示使用 SSE 流式输出。
-	StreamOptions streamOptions `json:"stream_options"`  // 控制流式响应附加信息。
+	Thinking        *thinkingConfig `json:"thinking,omitempty"`
+	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
+	MaxTokens       int             `json:"max_tokens,omitempty"`
+	Model           string          `json:"model"`           // 百炼模型 ID，例如 qwen-plus。
+	Messages        []chatMessage   `json:"messages"`        // 当前完整消息历史。
+	Tools           []chatTool      `json:"tools,omitempty"` // 可用本地工具声明。
+	Stream          bool            `json:"stream"`          // true 表示使用 SSE 流式输出。
+	StreamOptions   streamOptions   `json:"stream_options"`  // 控制流式响应附加信息。
+}
+
+type thinkingConfig struct {
+	Type string `json:"type"`
 }
 
 // streamOptions 控制百炼流式响应是否在最后返回 Token 用量。
@@ -17,10 +23,11 @@ type streamOptions struct {
 
 // chatMessage 表示百炼协议中的一条消息。
 type chatMessage struct {
-	Role       string         `json:"role"`                   // user、assistant 或 tool。
-	Content    string         `json:"content,omitempty"`      // 文本正文。
-	ToolCalls  []chatToolCall `json:"tool_calls,omitempty"`   // assistant 发起的工具调用。
-	ToolCallID string         `json:"tool_call_id,omitempty"` // tool 结果关联的调用 ID。
+	ReasoningContent string         `json:"reasoning_content,omitempty"`
+	Role             string         `json:"role"`                   // user、assistant 或 tool。
+	Content          string         `json:"content,omitempty"`      // 文本正文。
+	ToolCalls        []chatToolCall `json:"tool_calls,omitempty"`   // assistant 发起的工具调用。
+	ToolCallID       string         `json:"tool_call_id,omitempty"` // tool 结果关联的调用 ID。
 }
 
 // chatTool 表示请求中的 function 工具声明。
@@ -64,8 +71,9 @@ type chatChoice struct {
 
 // chatDelta 表示一次流式响应中新增加的内容。
 type chatDelta struct {
-	Content   string              `json:"content"`    // 本次新增文本。
-	ToolCalls []chatToolCallDelta `json:"tool_calls"` // 本次新增工具调用片段。
+	ReasoningContent string              `json:"reasoning_content"`
+	Content          string              `json:"content"`    // 本次新增文本。
+	ToolCalls        []chatToolCallDelta `json:"tool_calls"` // 本次新增工具调用片段。
 }
 
 // chatToolCallDelta 使用 Index 关联同一工具调用的多个片段。
