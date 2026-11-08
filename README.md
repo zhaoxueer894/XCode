@@ -19,7 +19,7 @@ XCode 是一个用 Go 写的多智能体编码工具。你给它一个任务（�
 
 **通信与轨迹。** 下行是任务包（角色 + 任务描述），上行是结论摘要，不共享聊天记录。所有子智能体的行为事件带 `agent_id` 汇入同一条 JSONL 轨迹，谁做了什么可回查。
 
-**完成门禁。** 模型声称"做完了"不算数。XCode 会强制派一个全新上下文的 reviewer 复查，输出 `GATE-VERDICT: PASS` 或 `ISSUES`；被打回就把问题作为证据回注循环继续修。编译、测试这些环境真实结果才是最终事实源。
+**完成门禁。** 传入完成契约后，XCode 会在模型声称完成时运行验证命令；契约启用 `review` 时，再派一个全新上下文的 reviewer 复查，输出 `GATE-VERDICT: PASS` 或 `ISSUES`。被打回就继续修，直到通过或预算耗尽。编译、测试这些环境真实结果才是最终事实源。
 
 想验证多智能体是否真的有收益？`xcode eval --no-delegate` 一键关闭委派，同一批任务对照单智能体跑分。
 
@@ -37,6 +37,14 @@ bin/xcode.exe --provider demo "please read go.mod"
 具体行为也就一条：把提示词的最后一个词当文件名，发起一次 `read_file`，然后照本宣科地返回结果。它不会理解你的任务，更不会真的修 bug——**真实任务请接下面的真实模型**。
 
 ## 配置模型
+
+也支持 DeepSeek。可以直接使用仓库外的配置文本，无需把密钥复制进项目：
+
+```bash
+bin/xcode.exe --model-config C:/private/deepseek.txt "修复这个项目的问题并运行测试"
+```
+
+文本中的 `model:` 指定实际模型，`api-key:` 后填写密钥。默认启用思考并保留连续工具调用需要的思考状态；运行记录不包含密钥。也可使用 `--provider deepseek`，通过 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` 配置。
 
 主模型用的是**阿里云百炼的通义千问**（默认 `qwen-plus`，可换成百炼上的其他模型），通过百炼的 OpenAI 兼容接口调用。按以下三步完成配置：
 
@@ -127,6 +135,7 @@ bin/xcode.exe --provider bailian --resume
 {
   "goal": "修复 utils.go 中的越界访问",
   "acceptance": ["go test 全部通过"],
+  "review": true,
   "verify_commands": [
     { "name": "go test", "command": ["go", "test", "./..."] }
   ]
@@ -140,6 +149,10 @@ bin/xcode.exe --provider bailian --contract task.json "修复 utils.go 里的越
 模型声称完成时，XCode 会在当前工作区真实运行 `verify_commands`，并派 reviewer 复查；不通过就打回继续修，直到通过或预算耗尽。
 
 ### 评测
+
+新的外部评测入口和分阶段实施说明见 [evals/README.md](evals/README.md)。它运行真实 CLI，保存失败结果，统一计算主/子 agent 和摘要的模型预算，并提供 Harbor 适配和完整 patch 导出。
+
+下面的 `xcode eval` 是内部小任务回归，不能据此宣称真实仓库能力或企业级可靠性。demo 模型只用于检查链路。
 
 用固定任务集跑分，多 Trial 取均值和方差：
 
@@ -176,15 +189,20 @@ xcode eval-fault                 故障注入评测：对比不同压缩/恢复�
 运行参数优先级：命令行 flag > 项目级 `.xcode/config` > 全局 `~/.xcode/config` > 内置默认值。常用的几项：
 
 ```text
-provider=bailian          # demo 或 bailian
+provider=bailian          # demo / bailian / deepseek
 mode=workspace-write      # plan / workspace-write / full-access
-context-strategy=none     # none / sliding / handoff / compaction
+context-strategy=bounded  # bounded / none / sliding / handoff / compaction / decision-gated
+context-budget=6000      # 模型可见历史的估算 token 目标；不含工具说明
 max-steps=8               # 单次任务最大模型轮数
 sandbox=host              # host / docker / docker-wsl
 timeout=2m
 ```
 
 其他可选文件：`.xcode/policy.json`（工具放行/拒绝规则）、`.xcode/skills/<角色>.md`（自定义 delegate 角色）、`.xcode/memory.md`（项目级记忆，每次运行注入）。
+
+默认 `bounded` 保留任务、项目要求和最近的完整工具往返，将较早结果收敛为带 artifact 引用的证据记录。完整历史仍保存，当前任务或最新一次工具往返过大时可以超过目标，工具调用和结果不会被拆开。`none` 可显式关闭压缩。每次模型调用还会收到最新的共享请求/token 余额及剩余时间；这些提示不重复写入会话历史。
+
+命令执行前的快照支持符号链接：保存、恢复链接本身，不读取链接目标。构建工具所需的 Go 缓存、并发设置及已激活的 Python 环境会传给命令，模型 API 密钥不传给命令子进程。
 
 ## 测试
 
