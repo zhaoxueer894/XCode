@@ -39,8 +39,8 @@ func Defaults() Config {
 	return Config{
 		Provider:        "demo",
 		Mode:            "workspace-write",
-		ContextStrategy: "none",
-		ContextBudget:   12000,
+		ContextStrategy: "bounded",
+		ContextBudget:   6000,
 		MaxSteps:        8,
 		MaxTokens:       0,
 		Sandbox:         "host",

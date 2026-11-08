@@ -3,9 +3,12 @@ package checkpoint
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -22,8 +25,28 @@ func (s *Store) CaptureWorkspace(ctx context.Context) (Entry, error) {
 		return Entry{}, err
 	}
 	entry := Entry{Time: time.Now().UTC(), Path: ".", Workspace: s.workspaceID(), WholeWorkspace: true}
+	root, err := os.OpenRoot(s.workspaceRoot)
+	if err != nil {
+		return Entry{}, err
+	}
+	defer root.Close()
 	for _, path := range paths {
-		file, err := s.Capture(ctx, path)
+		info, err := root.Lstat(path)
+		if err != nil {
+			return Entry{}, err
+		}
+		var file Entry
+		if info.Mode()&os.ModeSymlink != 0 {
+			target, linkErr := root.Readlink(path)
+			if linkErr != nil {
+				return Entry{}, linkErr
+			}
+			digest := sha256.Sum256([]byte(target))
+			file, err = s.saveEntry(Entry{Time: time.Now().UTC(), Path: path, Workspace: s.workspaceID(), Existed: true,
+				LinkTarget: target, SizeBytes: len(target), ContentHash: hex.EncodeToString(digest[:])}, []byte(target))
+		} else {
+			file, err = s.Capture(ctx, path)
+		}
 		if err != nil {
 			return Entry{}, err
 		}
@@ -47,7 +70,7 @@ func (s *Store) CaptureWorkspace(ctx context.Context) (Entry, error) {
 	return entry, nil
 }
 
-// workspaceFiles 列出快照范围内全部普通文件，包括普通 Git 忽略文件，拒绝不支持的文件类型。
+// workspaceFiles includes regular files and link metadata, without following links.
 func (s *Store) workspaceFiles(ctx context.Context) ([]string, error) {
 	view, err := workspace.Open(s.workspaceRoot)
 	if err != nil {
@@ -79,7 +102,7 @@ func (s *Store) workspaceFiles(ctx context.Context) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		if !info.Mode().IsRegular() {
+		if !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
 			return fmt.Errorf("workspace checkpoint does not support non-regular file %q", path)
 		}
 		if len(paths) >= 20_000 {
@@ -110,7 +133,7 @@ func (s *Store) restoreWorkspace(ctx context.Context, entry Entry) error {
 	original := make(map[string]bool, len(entry.Files))
 	for _, file := range entry.Files {
 		original[file.Path] = true
-		if err := s.restoreFile(ctx, file); err != nil {
+		if err := s.restoreWorkspaceMember(ctx, file); err != nil {
 			return fmt.Errorf("restore %q (workspace may be partially restored): %w", file.Path, err)
 		}
 	}
@@ -119,9 +142,77 @@ func (s *Store) restoreWorkspace(ctx context.Context, entry Entry) error {
 			continue
 		}
 		absent := Entry{ID: entry.ID, Workspace: s.workspaceID(), Path: path}
-		if err := s.restoreFile(ctx, absent); err != nil {
+		if err := s.restoreWorkspaceMember(ctx, absent); err != nil {
 			return fmt.Errorf("remove newly created %q: %w", path, err)
 		}
 	}
 	return nil
+}
+
+// Restore a leaf without following a current or saved symbolic link. Parent
+// traversal remains confined by os.Root; direct file writes still reject links.
+func (s *Store) restoreWorkspaceMember(ctx context.Context, entry Entry) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := validateEntry(entry); err != nil {
+		return err
+	}
+	if entry.Workspace != s.workspaceID() {
+		return fmt.Errorf("checkpoint workspace mismatch")
+	}
+	view, err := workspace.Open(s.workspaceRoot)
+	if err != nil {
+		return err
+	}
+	if view.IsHardExcluded(entry.Path) {
+		return fmt.Errorf("checkpoint path is excluded")
+	}
+	// Resolve the parent independently so a replaceable leaf link is allowed,
+	// while a command-created parent link cannot redirect restoration into state
+	// directories or another part of the workspace.
+	probe := filepath.ToSlash(filepath.Join(filepath.Dir(entry.Path), ".xcode-restore-parent-check"))
+	_, canonical, err := view.ResolveForWrite(probe)
+	if err != nil {
+		return err
+	}
+	if canonical != probe || view.IsHardExcluded(canonical) {
+		return fmt.Errorf("restore parent was redirected")
+	}
+	root, err := os.OpenRoot(s.workspaceRoot)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	info, statErr := root.Lstat(entry.Path)
+	if statErr != nil && !os.IsNotExist(statErr) {
+		return statErr
+	}
+	if entry.LinkTarget != "" {
+		content, err := s.readBlob(entry)
+		if err != nil {
+			return err
+		}
+		if string(content) != entry.LinkTarget {
+			return fmt.Errorf("symlink checkpoint content mismatch")
+		}
+		if err := root.MkdirAll(filepath.Dir(entry.Path), 0o755); err != nil {
+			return err
+		}
+		if statErr == nil {
+			if info.IsDir() {
+				return fmt.Errorf("restore target is a directory")
+			}
+			if err := root.Remove(entry.Path); err != nil {
+				return err
+			}
+		}
+		return root.Symlink(entry.LinkTarget, entry.Path)
+	}
+	if statErr == nil && info.Mode()&os.ModeSymlink != 0 {
+		if err := root.Remove(entry.Path); err != nil {
+			return err
+		}
+	}
+	return s.restoreFile(ctx, entry)
 }

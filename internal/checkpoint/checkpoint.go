@@ -24,7 +24,7 @@ const maxCheckpointBytes = 8 << 20 // 单个文件快照上限 8 MiB，与 read_
 type Entry struct {
 	Workspace      string    `json:"workspace"`                 // 保存工作区身份哈希，拒绝跨工作区恢复。
 	Files          []Entry   `json:"files,omitempty"`           // 工作区快照保存各文件的旧状态；单文件快照为空。
-	WholeWorkspace bool      `json:"whole_workspace,omitempty"` // 表示恢复范围为全部非硬性排除的普通文件。
+	WholeWorkspace bool      `json:"whole_workspace,omitempty"` // All non-excluded regular files and symbolic-link metadata.
 	ID             string    `json:"id"`                        // 保存快照唯一编号，恢复时使用。
 	Time           time.Time `json:"time"`                      // 保存快照创建的 UTC 时间。
 	Path           string    `json:"path"`                      // 保存被保护文件相对工作区根目录的斜杠路径。
@@ -32,6 +32,7 @@ type Entry struct {
 	ContentHash    string    `json:"content_hash,omitempty"`    // 保存写入前完整文件内容的 SHA-256。
 	SizeBytes      int       `json:"size_bytes"`                // 保存写入前文件的字节数。
 	FileMode       uint32    `json:"file_mode,omitempty"`       // 保存写入前文件的权限位，恢复时原样还原。
+	LinkTarget     string    `json:"link_target,omitempty"`     // Whole-workspace snapshots save link text, never target contents.
 }
 
 // Store 把快照内容保存到受权限保护的本地目录，并用 manifest 记录快照顺序。
@@ -159,6 +160,10 @@ func (s *Store) Capture(ctx context.Context, relative string) (Entry, error) {
 		return Entry{}, fmt.Errorf("inspect %q for checkpoint: %w", clean, statErr)
 	}
 
+	return s.saveEntry(entry, content)
+}
+
+func (s *Store) saveEntry(entry Entry, content []byte) (Entry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	nonce := make([]byte, 16)
@@ -199,6 +204,9 @@ func (s *Store) Restore(ctx context.Context, id string) (Entry, error) {
 		}
 		if entry.WholeWorkspace {
 			return entry, s.restoreWorkspace(ctx, entry)
+		}
+		if entry.LinkTarget != "" {
+			return entry, s.restoreWorkspaceMember(ctx, entry)
 		}
 		return entry, s.restoreFile(ctx, entry)
 
@@ -336,6 +344,9 @@ func validateEntry(entry Entry) error {
 	}
 	if entry.SizeBytes < 0 || entry.SizeBytes > maxCheckpointBytes || entry.FileMode & ^uint32(0o777) != 0 {
 		return fmt.Errorf("invalid checkpoint size or mode")
+	}
+	if entry.LinkTarget != "" && (!entry.Existed || entry.SizeBytes != len(entry.LinkTarget) || strings.ContainsRune(entry.LinkTarget, 0)) {
+		return fmt.Errorf("invalid symlink checkpoint")
 	}
 	if entry.Existed {
 		digest, err := hex.DecodeString(entry.ContentHash)

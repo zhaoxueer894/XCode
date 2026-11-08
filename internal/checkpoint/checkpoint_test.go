@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -47,6 +48,72 @@ func TestWorkspaceRestore(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(root, ".env"))
 	if err != nil || string(data) != "new" {
 		t.Fatalf("excluded file changed: %q %v", data, err)
+	}
+}
+
+func TestWorkspaceRestoresLinkMetadataAndNeverReadsOutsideTarget(t *testing.T) {
+	root, outside := t.TempDir(), filepath.Join(t.TempDir(), "private.txt")
+	if err := os.WriteFile(outside, []byte("PRIVATE-OUTSIDE-CONTENT"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "node_modules", ".bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "regular.txt"), []byte("original"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	links := map[string]string{"node_modules/.bin/tool": "../tool.js", "outside": outside, "dangling": "missing-file"}
+	for name, target := range links {
+		if err := os.Symlink(target, filepath.Join(root, filepath.FromSlash(name))); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+	}
+	store, err := NewStore(filepath.Join(root, ".xcode-state", "checkpoints"), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, err := store.CaptureWorkspace(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range entry.Files {
+		b, err := store.ReadBlob(file)
+		if err != nil || strings.Contains(string(b), "PRIVATE-OUTSIDE-CONTENT") {
+			t.Fatalf("followed link: %q %v", b, err)
+		}
+	}
+	if err := os.Remove(filepath.Join(root, "dangling")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "dangling"), []byte("replacement"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, "regular.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "regular.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "new-link")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Restore(context.Background(), entry.ID); err != nil {
+		t.Fatal(err)
+	}
+	for name, target := range links {
+		got, err := os.Readlink(filepath.Join(root, filepath.FromSlash(name)))
+		if err != nil || got != target {
+			t.Fatalf("link %s = %s %v", name, got, err)
+		}
+	}
+	if b, err := os.ReadFile(filepath.Join(root, "regular.txt")); err != nil || string(b) != "original" {
+		t.Fatalf("file: %q %v", b, err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "new-link")); !os.IsNotExist(err) {
+		t.Fatalf("new link remains: %v", err)
+	}
+	if b, err := os.ReadFile(outside); err != nil || string(b) != "PRIVATE-OUTSIDE-CONTENT" {
+		t.Fatalf("outside target changed: %q %v", b, err)
 	}
 }
 

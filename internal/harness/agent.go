@@ -108,6 +108,7 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 	}
 	a.emit(Event{Kind: RunStarted, Data: lastInput})
 	var totalUsage Usage
+	progress := runtimeProgress{}
 	// 轮次开始边界——记录本轮用户输入，崩溃后恢复器从这段记录重建消息历史。
 	a.turnLog.AppendStarted(lastInput, len(options.ResumePending) > 0)
 
@@ -115,7 +116,7 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 	// 让重建的消息历史重新满足“每个 tool_call 都有对应 tool 消息”的模型协议要求。
 	// 补执行与正常循环共用 runToolCall 路径，事件与恢复日志完全一致；step 0 表示恢复补执行。
 	for _, call := range options.ResumePending {
-		if a.runToolCall(ctx, 0, call, &messages, doom) {
+		if a.runToolCall(ctx, 0, call, &messages, doom, &progress) {
 			err := fmt.Errorf("%w: %s repeated %d times in a row", ErrDoomLoop, call.Name, doom.streak)
 			a.fail(0, StopDoomLoop, err)
 			return RunResult{StopReason: StopDoomLoop, Steps: 0, Usage: totalUsage, Messages: messages}, err
@@ -157,16 +158,22 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 		modelSink := ModelEventSinkFunc(func(event ModelEvent) {
 			a.emitModelEvent(step, event)
 		})
-		response, err := a.model.Generate(ctx, modelInput, a.runner.Specs(), modelSink)
+		modelContext := context.WithValue(ctx, runtimeProgressKey{}, progress)
+		response, err := a.model.Generate(modelContext, modelInput, a.runner.Specs(), modelSink)
 		if err != nil {
-			a.fail(step, StopFailed, err)
-			return RunResult{StopReason: StopFailed, Steps: step, Usage: totalUsage, Messages: messages}, fmt.Errorf("generate at step %d: %w", step, err)
+			reason := StopFailed
+			if errors.Is(err, ErrBudget) {
+				reason = StopBudget
+			}
+			a.fail(step, reason, err)
+			return RunResult{StopReason: reason, Steps: step, Usage: totalUsage, Messages: messages}, fmt.Errorf("generate at step %d: %w", step, err)
 		}
 
 		assistant := Message{
-			Role:      "assistant",
-			Content:   response.Content,
-			ToolCalls: response.ToolCalls,
+			Role:             "assistant",
+			Content:          response.Content,
+			ReasoningContent: response.ReasoningContent,
+			ToolCalls:        response.ToolCalls,
 		}
 		messages = append(messages, assistant)
 		// 模型请求完成边界——assistant 消息（含全部工具调用）已确定，落盘供恢复重建。
@@ -211,7 +218,7 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 		}
 		for _, call := range response.ToolCalls {
 			// 单调用执行路径抽为 runToolCall，恢复预处理与正常循环共用同一实现。
-			if a.runToolCall(ctx, step, call, &messages, doom) {
+			if a.runToolCall(ctx, step, call, &messages, doom, &progress) {
 				err := fmt.Errorf("%w: %s repeated %d times in a row", ErrDoomLoop, call.Name, doom.streak)
 				a.fail(step, StopDoomLoop, err)
 				return RunResult{StopReason: StopDoomLoop, Steps: step, Usage: totalUsage, Messages: messages}, err
@@ -219,13 +226,13 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 		}
 	}
 	a.fail(maxSteps, StopMaxSteps, ErrMaxSteps)
-	return RunResult{StopReason: StopMaxSteps, Steps: maxSteps - 1, Usage: totalUsage, Messages: messages}, ErrMaxSteps
+	return RunResult{StopReason: StopMaxSteps, Steps: maxSteps, Usage: totalUsage, Messages: messages}, ErrMaxSteps
 }
 
 // runToolCall 执行单个工具调用并追加 tool 消息；返回 true 表示 doom-loop 触发，
 // 调用方应停止本次 Run。工具开始与完成边界同步写入轮次恢复日志：
 // begin 记录使崩溃窗口可被 journal 对账，end 记录是“结果已落盘”的恢复游标。
-func (a *Agent) runToolCall(ctx context.Context, step int, call ToolCall, messages *[]Message, doom *doomLoopDetector) bool {
+func (a *Agent) runToolCall(ctx context.Context, step int, call ToolCall, messages *[]Message, doom *doomLoopDetector, progress *runtimeProgress) bool {
 	if doom.register(call) {
 		return true
 	}
@@ -239,6 +246,7 @@ func (a *Agent) runToolCall(ctx context.Context, step int, call ToolCall, messag
 	// 工具开始边界——此后副作用随时可能发生，journal 与恢复日志共同标记该窗口。
 	a.turnLog.AppendToolBegin(step, call)
 	result, toolErr := a.runner.Execute(ctx, call)
+	progress.observe(call, toolErr)
 	output := result.Observation
 	if toolErr != nil {
 		output = "ERROR: " + toolErr.Error()

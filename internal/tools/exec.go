@@ -50,7 +50,7 @@ func (t *Exec) Spec() harness.ToolSpec {
 					"items":    map[string]any{"type": "string"},
 					"minItems": 1,
 				},
-				"workdir":         map[string]any{"type": "string"},
+				"workdir":         map[string]any{"type": "string", "description": "Workspace-relative directory, defaults to '.'. Do not guess an absolute repository path."},
 				"timeout_seconds": map[string]any{"type": "integer", "minimum": 1, "maximum": maxExecTimeoutSeconds},
 			},
 			"required":             []string{"command"},
@@ -242,7 +242,7 @@ func runHostCommand(ctx context.Context, workdir string, argv []string, timeout 
 
 // allowedEnvironment 只把白名单内的宿主环境变量透传给子进程，避免泄露密钥类变量。
 func allowedEnvironment() []string {
-	allowed := []string{"PATH", "HOME", "TMPDIR", "LANG", "GOCACHE", "SystemRoot", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA", "APPDATA"}
+	allowed := []string{"PATH", "HOME", "TMPDIR", "LANG", "GOCACHE", "GOPATH", "GOMODCACHE", "GOENV", "GOFLAGS", "GOMAXPROCS", "GOTOOLCHAIN", "GOPROXY", "GOSUMDB", "GONOSUMDB", "GOPRIVATE", "GONOPROXY", "VIRTUAL_ENV", "CONDA_PREFIX", "CONDA_DEFAULT_ENV", "PYTHONPATH", "PYTHONNOUSERSITE", "SystemRoot", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA", "APPDATA"}
 	environment := make([]string, 0, len(allowed))
 	for _, name := range allowed {
 		if value := os.Getenv(name); value != "" {

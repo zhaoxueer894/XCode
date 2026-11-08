@@ -50,6 +50,10 @@ func TestProcessHelper(t *testing.T) {
 		fmt.Fprint(os.Stderr, "stderr-evidence")
 	case "environment":
 		fmt.Print(os.Getenv("XCODE_TEST_SECRET"))
+	case "build-environment":
+		for _, name := range []string{"GOPATH", "GOMODCACHE", "GOFLAGS", "GOMAXPROCS", "CONDA_PREFIX", "DEEPSEEK_API_KEY"} {
+			fmt.Printf("%s=%s\n", name, os.Getenv(name))
+		}
 	case "child":
 		time.Sleep(3 * time.Second)
 		if err := os.WriteFile(path, []byte("escaped"), 0o600); err != nil {
@@ -71,6 +75,25 @@ func TestProcessHelper(t *testing.T) {
 		os.Exit(6)
 	}
 	os.Exit(0)
+}
+
+func TestHostPreservesPreparedBuildEnvironmentWithoutModelCredentials(t *testing.T) {
+	for key, value := range map[string]string{"GOPATH": "/cached/go", "GOMODCACHE": "/cached/mod", "GOFLAGS": "-p=2", "GOMAXPROCS": "2", "CONDA_PREFIX": "/cached/conda"} {
+		t.Setenv(key, value)
+	}
+	t.Setenv("DEEPSEEK_API_KEY", "must-not-leak")
+	result := runHostCommand(context.Background(), t.TempDir(), helperArgs(t, "build-environment", ""), 10*time.Second)
+	if result.startErr != nil || result.exitCode != 0 {
+		t.Fatalf("command: %+v", result)
+	}
+	for _, want := range []string{"GOPATH=/cached/go", "GOMODCACHE=/cached/mod", "GOFLAGS=-p=2", "GOMAXPROCS=2", "CONDA_PREFIX=/cached/conda", "DEEPSEEK_API_KEY=\n"} {
+		if !strings.Contains(result.stdout, want) {
+			t.Fatalf("missing %s: %s", want, result.stdout)
+		}
+	}
+	if strings.Contains(result.stdout, "must-not-leak") {
+		t.Fatal("model credential leaked")
+	}
 }
 
 // TestHostOutputLimit 验证输出被截断但实际字节计数和 stderr 仍保留。

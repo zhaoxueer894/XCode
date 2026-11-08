@@ -38,7 +38,7 @@ type applyPatchArgs struct {
 func (t *ApplyPatch) Spec() harness.ToolSpec {
 	return harness.ToolSpec{
 		Name:        "apply_patch",
-		Description: "Create, update (exact string replacement) or delete one UTF-8 text file inside the workspace",
+		Description: "Edit one UTF-8 workspace file. Always set operation: create (requires content), update (requires old_string and new_string; exact unique match), or delete.",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

@@ -9,10 +9,11 @@ import (
 )
 
 type Message struct {
-	Role       string     `json:"role"`                   // 消息角色：tool、assistant、user
-	Content    string     `json:"content,omitempty"`      // 消息正文
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`   // 本次要调用的tools
-	ToolCallID string     `json:"tool_call_id,omitempty"` // tool消息对应的工具调用ID
+	ReasoningContent string     `json:"reasoning_content,omitempty"` // Provider continuation state for thinking/tool calls.
+	Role             string     `json:"role"`                        // 消息角色：tool、assistant、user
+	Content          string     `json:"content,omitempty"`           // 消息正文
+	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`        // 本次要调用的tools
+	ToolCallID       string     `json:"tool_call_id,omitempty"`      // tool消息对应的工具调用ID
 }
 
 // 模型希望harness执行的工具调用，以结构体定义
@@ -85,10 +86,11 @@ func (f ModelEventSinkFunc) EmitModelEvent(event ModelEvent) {
 
 // 一次模型调用的归一化结果：可以返回Content ｜ ToolCalls调用
 type ModelResponse struct {
-	Content      string     // 文本
-	ToolCalls    []ToolCall // 工具调用列表
-	Usage        Usage      // 本次请求最终 Token 用量。
-	FinishReason string     // Provider 返回的停止原因。
+	ReasoningContent string
+	Content          string     // 文本
+	ToolCalls        []ToolCall // 工具调用列表
+	Usage            Usage      // 本次请求最终 Token 用量。
+	FinishReason     string     // Provider 返回的停止原因。
 }
 
 // Model接口： 隔离不同模型供应商协议差异，实现Generate方法
@@ -162,6 +164,8 @@ const (
 	ModelToolCallDeltaEmitted EventKind = "model.tool_call.delta" // 模型新增工具调用片段。
 	ModelUsageEmitted         EventKind = "model.usage"           // 模型返回 Token 用量。
 	ModelFinishedEmitted      EventKind = "model.finished"        // 模型返回停止原因。
+	ModelRequestStarted       EventKind = "model.request.started" // Run-wide request accounting, including summaries.
+	ModelRequestCompleted     EventKind = "model.request.completed"
 )
 
 // 结构化运行记录
