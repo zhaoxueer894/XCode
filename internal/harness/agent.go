@@ -246,7 +246,7 @@ func (a *Agent) runToolCall(ctx context.Context, step int, call ToolCall, messag
 	// 工具开始边界——此后副作用随时可能发生，journal 与恢复日志共同标记该窗口。
 	a.turnLog.AppendToolBegin(step, call)
 	result, toolErr := a.runner.Execute(ctx, call)
-	progress.observe(call, toolErr)
+	progress.observe(call, result, toolErr)
 	output := result.Observation
 	if toolErr != nil {
 		output = "ERROR: " + toolErr.Error()

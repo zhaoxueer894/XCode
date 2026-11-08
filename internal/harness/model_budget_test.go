@@ -129,3 +129,128 @@ func TestSharedBudgetFlagsMissingUsage(t *testing.T) {
 		t.Fatal("unknown usage was treated as known zero")
 	}
 }
+
+func TestFinalBudgetRequestDisablesToolsByCallLimit(t *testing.T) {
+	budget := harness.NewModelBudget(2, 0, nil)
+	specs := []harness.ToolSpec{{Name: "read_file"}}
+	var toolCounts []int
+	var notices []string
+	model := budget.Wrap(modelFunc(func(_ context.Context, messages []harness.Message, tools []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+		toolCounts = append(toolCounts, len(tools))
+		notices = append(notices, messages[0].Content)
+		return harness.ModelResponse{Usage: harness.Usage{TotalTokens: 1}}, nil
+	}), "agent")
+	for range 2 {
+		if _, err := model.Generate(context.Background(), nil, specs, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if toolCounts[0] != 1 || toolCounts[1] != 0 {
+		t.Fatalf("tools on final request should be disabled: %v", toolCounts)
+	}
+	if !strings.Contains(notices[1], "FINAL REQUEST") {
+		t.Fatalf("missing final-request directive: %s", notices[1])
+	}
+	if strings.Contains(notices[0], "FINAL REQUEST") {
+		t.Fatalf("final directive fired too early: %s", notices[0])
+	}
+}
+
+func TestFinalBudgetRequestDisablesToolsByTokenShare(t *testing.T) {
+	// 每次请求花 96 token：第二次请求前剩余 4，不足预算的 5%，按最后一请求处理。
+	budget := harness.NewModelBudget(0, 100, nil)
+	var toolCounts []int
+	model := budget.Wrap(modelFunc(func(_ context.Context, _ []harness.Message, tools []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+		toolCounts = append(toolCounts, len(tools))
+		return harness.ModelResponse{Usage: harness.Usage{TotalTokens: 96}}, nil
+	}), "agent")
+	for range 2 {
+		if _, err := model.Generate(context.Background(), nil, []harness.ToolSpec{{Name: "read_file"}}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if toolCounts[0] != 1 || toolCounts[1] != 0 {
+		t.Fatalf("tools on final request should be disabled: %v", toolCounts)
+	}
+}
+
+func TestBudgetGuidanceUrgesFinishAfterVerifiedProductionEdit(t *testing.T) {
+	registry, err := harness.NewRegistry(staticTool{name: "apply_patch", output: "updated"}, staticTool{name: "exec", output: "command=ok exit_code=0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := 0
+	model := modelFunc(func(_ context.Context, messages []harness.Message, _ []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+		step++
+		notice := messages[0].Content
+		if step == 3 {
+			if !strings.Contains(notice, "1 production edits, 0 test-only edits; 1 tool calls and 1 successful command(s)") {
+				t.Fatalf("successful command not tracked: %s", notice)
+			}
+			if !strings.Contains(notice, "finish now") {
+				t.Fatalf("no finish guidance: %s", notice)
+			}
+		}
+		if step == 4 {
+			// 第二次生产编辑后成功命令计数必须清零：旧的成功结果没有见过最新改动。
+			if !strings.Contains(notice, "0 tool calls and 0 successful command(s)") {
+				t.Fatalf("successful-command counter not reset: %s", notice)
+			}
+			return harness.ModelResponse{Content: "done", Usage: harness.Usage{TotalTokens: 10}}, nil
+		}
+		var call harness.ToolCall
+		if step == 1 || step == 3 {
+			call = harness.ToolCall{ID: fmt.Sprintf("edit-%d", step), Name: "apply_patch", Arguments: json.RawMessage(`{"path":"source.go","operation":"update"}`)}
+		} else {
+			call = harness.ToolCall{ID: fmt.Sprintf("verify-%d", step), Name: "exec", Arguments: json.RawMessage(`{"command":["go","test"]}`)}
+		}
+		return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 10}}, nil
+	})
+	budget := harness.NewModelBudget(20, 2000, nil)
+	agent := harness.NewAgent(budget.Wrap(model, "agent"), registry, 12, nil)
+	if _, err := agent.Run(context.Background(), "implement the requested fix"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// failingExecTool 模拟退出码非 0 的命令：观察文本无关紧要，结构化退出码才是事实源。
+type failingExecTool struct{}
+
+func (failingExecTool) Spec() harness.ToolSpec { return harness.ToolSpec{Name: "exec"} }
+
+func (failingExecTool) Execute(context.Context, json.RawMessage) (harness.ToolResult, error) {
+	return harness.ToolResult{Observation: "command=x exit_code=1", ExitCode: 1}, nil
+}
+
+func TestBudgetGuidanceFlagsUnverifiedProductionEdit(t *testing.T) {
+	registry, err := harness.NewRegistry(failingExecTool{}, staticTool{name: "apply_patch", output: "updated"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := 0
+	model := modelFunc(func(_ context.Context, messages []harness.Message, _ []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+		step++
+		notice := messages[0].Content
+		if step == 8 {
+			if !strings.Contains(notice, "no successful command has been observed after it") {
+				t.Fatalf("failing commands counted as verification: %s", notice)
+			}
+			if strings.Contains(notice, "finish now") {
+				t.Fatalf("unverified change urged to finish: %s", notice)
+			}
+			return harness.ModelResponse{Content: "done", Usage: harness.Usage{TotalTokens: 10}}, nil
+		}
+		if step == 1 {
+			call := harness.ToolCall{ID: "edit-1", Name: "apply_patch", Arguments: json.RawMessage(`{"path":"source.go","operation":"update"}`)}
+			return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 10}}, nil
+		}
+		// 参数逐次变化，避免触发相邻相同调用的 doom-loop 保护。
+		call := harness.ToolCall{ID: fmt.Sprintf("fail-%d", step), Name: "exec", Arguments: json.RawMessage(fmt.Sprintf(`{"command":["go","test","-run","Case%d"]}`, step))}
+		return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 10}}, nil
+	})
+	budget := harness.NewModelBudget(20, 2000, nil)
+	agent := harness.NewAgent(budget.Wrap(model, "agent"), registry, 12, nil)
+	if _, err := agent.Run(context.Background(), "implement the requested fix"); err != nil {
+		t.Fatal(err)
+	}
+}

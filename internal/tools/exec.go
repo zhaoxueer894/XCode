@@ -167,7 +167,13 @@ func (t *Exec) Execute(ctx context.Context, raw json.RawMessage) (harness.ToolRe
 		content = append(content, []byte("\nWARNING: command finished but index refresh failed: "+refreshErr.Error())...)
 	}
 	resource := "exec:" + strings.Join(args.Command, " ")
-	return t.runtime.results.build(ctx, resource, "", "", content)
+	result, err := t.runtime.results.build(ctx, resource, "", "", content)
+	if err != nil {
+		return harness.ToolResult{}, err
+	}
+	// 退出码与观察文本同源（同一次 outcome），供进度追踪识别"编辑后有成功命令"。
+	result.ExitCode = outcome.exitCode
+	return result, nil
 }
 
 // execOutcome 保存一次命令运行的退出码、输出和运行状态。

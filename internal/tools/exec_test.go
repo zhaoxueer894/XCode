@@ -59,6 +59,9 @@ func TestProcessHelper(t *testing.T) {
 		if err := os.WriteFile(path, []byte("escaped"), 0o600); err != nil {
 			os.Exit(3)
 		}
+	case "fail":
+		// 以非零退出码结束，供退出码传播测试使用。
+		os.Exit(7)
 	case "parent":
 		executable, err := os.Executable()
 		if err != nil {
@@ -157,5 +160,43 @@ func TestExecIntentSkipsHostResolutionWithSandbox(t *testing.T) {
 	hostSet.SetSandbox(sandbox.DockerBackend{Image: "alpine:3.20"})
 	if _, err := hostExec.(executor.IntentDescriber).DescribeIntent(raw); err != nil {
 		t.Fatalf("sandbox path should skip host resolution: %v", err)
+	}
+}
+
+func TestExecResultExposesStructuredExitCode(t *testing.T) {
+	root := t.TempDir()
+	store := artifactstore.NewMemoryStore()
+	hostSet, err := NewReadOnlySet(context.Background(), root, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	execTool := hostSet.WriteTools()[1]
+	rawCommand := func(command []string) json.RawMessage {
+		t.Helper()
+		data, err := json.Marshal(map[string]any{"command": command})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+
+	ok, err := execTool.Execute(context.Background(), rawCommand(helperArgs(t, "environment", "")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok.ExitCode != 0 {
+		t.Fatalf("successful command exit code = %d", ok.ExitCode)
+	}
+
+	failed, err := execTool.Execute(context.Background(), rawCommand(helperArgs(t, "fail", "")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 非零退出码是命令结果不是工具错误；结构化字段供进度追踪识别收尾时机。
+	if failed.ExitCode != 7 {
+		t.Fatalf("failed command exit code = %d", failed.ExitCode)
+	}
+	if !strings.Contains(failed.Observation, "exit_code=7") {
+		t.Fatalf("observation missing exit code: %s", failed.Observation)
 	}
 }

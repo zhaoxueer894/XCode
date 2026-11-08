@@ -14,11 +14,24 @@ type runtimeProgress struct {
 	ProductionEdits int
 	TestEdits       int
 	CallsSinceEdit  int
+	// ExecOKAfterEdit counts successful commands (exit code 0) observed after
+	// the last production edit. A new production edit resets it: earlier green
+	// runs did not see the newest change.
+	ExecOKAfterEdit int
 }
 
-func (p *runtimeProgress) observe(call ToolCall, err error) {
+func (p *runtimeProgress) observe(call ToolCall, result ToolResult, err error) {
 	p.CallsSinceEdit++
-	if err != nil || call.Name != "apply_patch" {
+	if err != nil {
+		return
+	}
+	if call.Name == "exec" {
+		if result.ExitCode == 0 && p.ProductionEdits > 0 {
+			p.ExecOKAfterEdit++
+		}
+		return
+	}
+	if call.Name != "apply_patch" {
 		return
 	}
 	var args struct {
@@ -39,4 +52,5 @@ func (p *runtimeProgress) observe(call ToolCall, err error) {
 	}
 	p.ProductionEdits++
 	p.CallsSinceEdit = 0
+	p.ExecOKAfterEdit = 0
 }

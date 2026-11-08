@@ -40,6 +40,7 @@ type ToolResult struct {
 	VisibleBytes  int    // 保存完整结果中实际进入模型上下文的字节数，不包含元数据标题。
 	Truncated     bool   // 表示完整结果是否因为预览上限而只向模型展示一部分。
 	RepeatedRead  bool   // 表示同一文件范围和内容仍然存在于当前 Context Epoch。
+	ExitCode      int    // exec 工具的命令退出码；0 表示成功。其余工具不设置该字段。
 }
 
 // Usage 保存一次模型请求的 Token 用量。

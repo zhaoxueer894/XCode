@@ -120,20 +120,34 @@ func TestBatchActualCLIReadsWritesCreatesAndVerifies(t *testing.T) {
 }
 
 func TestBatchDisablesDelegateAndPreservesBudgetFailure(t *testing.T) {
-	root, args := batchFixture(t, []batchStep{{"read_file", map[string]any{"path": "README.md"}}}, func(request map[string]any) {
-		for _, tool := range request["tools"].([]any) {
+	toolBearingRequests := 0
+	root, args := batchFixture(t, []batchStep{
+		{"read_file", map[string]any{"path": "README.md"}},
+		{"read_file", map[string]any{"path": "go.mod"}},
+	}, func(request map[string]any) {
+		// 预算内最后一个允许的请求会禁用工具：此刻的工具调用结果永远无人消费。
+		advertised, ok := request["tools"].([]any)
+		if !ok {
+			return
+		}
+		toolBearingRequests++
+		for _, tool := range advertised {
 			if tool.(map[string]any)["function"].(map[string]any)["name"] == "delegate" {
 				t.Error("delegate advertised in single-agent mode")
 			}
 		}
 	})
 	_ = os.WriteFile(filepath.Join(root, "README.md"), []byte("hello"), 0o600)
-	args = append(args, "--max-model-calls", "1", "read README.md")
+	_ = os.WriteFile(filepath.Join(root, "go.mod"), []byte("module fixture\n"), 0o600)
+	args = append(args, "--max-model-calls", "2", "read README.md")
 	if err := runCLI(args); !errors.Is(err, harness.ErrBudget) {
 		t.Fatalf("error = %v", err)
 	}
+	if toolBearingRequests != 1 {
+		t.Fatalf("expected exactly one tool-bearing request before the final one, got %d", toolBearingRequests)
+	}
 	got := readBatchResult(t, root)
-	if got.Status != "stopped" || got.StopReason != harness.StopBudget || got.Model.Calls != 1 {
+	if got.Status != "stopped" || got.StopReason != harness.StopBudget || got.Model.Calls != 2 {
 		t.Fatalf("record = %+v", got)
 	}
 	// A failure must still leave complete, closed event and recovery logs.

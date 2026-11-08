@@ -61,10 +61,15 @@ func (m *budgetModel) Generate(ctx context.Context, messages []Message, tools []
 	b.mu.Unlock()
 	id := fmt.Sprintf("model-%06d", call)
 	if m.purpose != "summary" {
-		notice := b.guidance(ctx, call, spent, missing)
+		notice, finalRequest := b.guidance(ctx, call, spent, missing)
 		input := make([]Message, 0, len(messages)+1)
 		input = append(input, Message{Role: "system", Content: notice})
 		messages = append(input, messages...)
+		if finalRequest {
+			// 最后一个允许的请求：此时发起的工具调用，其结果永远等不到下一次
+			// 模型请求来消费。禁用工具，让这一请求直接产出最终回答。
+			tools = nil
+		}
 		b.emit(Event{Kind: EventKind("budget.status"), ToolCallID: id, Data: notice})
 	}
 	b.emit(Event{Kind: ModelRequestStarted, ToolCallID: id, Data: m.purpose})
@@ -101,41 +106,59 @@ func (m *budgetModel) Generate(ctx context.Context, messages []Message, tools []
 	return response, err
 }
 
-func (b *ModelBudget) guidance(ctx context.Context, call, spent, missing int) string {
+// guidance 生成每次模型请求前的运行时提示，并返回该请求是否为预算内最后一个允许
+// 的请求（final）。final 时调用方禁用工具：此刻的工具调用结果不可能再被看到。
+func (b *ModelBudget) guidance(ctx context.Context, call, spent, missing int) (string, bool) {
 	calls, tokens := "unlimited", "unlimited"
 	fraction := 1.0
+	final := false
 	if b.maxCalls > 0 {
 		left := max(0, b.maxCalls-call+1)
 		calls = fmt.Sprintf("%d/%d including this request", left, b.maxCalls)
 		fraction = min(fraction, float64(left)/float64(b.maxCalls))
+		if left <= 1 {
+			final = true
+		}
 	}
 	if b.maxTokens > 0 {
 		left := max(0, b.maxTokens-spent)
 		tokens = fmt.Sprintf("%d/%d cumulative input+output tokens", left, b.maxTokens)
 		fraction = min(fraction, float64(left)/float64(b.maxTokens))
+		// 剩余不足约 5% 时按最后一请求处理：再排工具调用的期望收益已低于
+		// 产出干净最终回答的价值。
+		if left*20 <= b.maxTokens {
+			final = true
+		}
 	}
 	clock := "not set"
 	if deadline, ok := ctx.Deadline(); ok {
 		clock = fmt.Sprintf("%.0f seconds", max(0, time.Until(deadline).Seconds()))
 	}
 	phase := "Locate the relevant code with narrow searches and reproduce the issue once. Form a concrete hypothesis, then implement the smallest justified production change."
-	if fraction <= 0.5 {
-		phase = "At least half the budget is used. For implementation tasks, prioritize a justified minimal production fix and its focused test over further broad investigation."
-	}
-	if fraction <= 0.2 {
+	switch {
+	case final:
+		phase = "FINAL REQUEST: no further model request is allowed after this one, so tools are disabled — a tool call now could never be observed. Write the final answer directly: what changed, how it was verified with actual command results, and what remains unverified."
+	case fraction <= 0.2:
 		phase = "The budget is nearly exhausted. Validate the current change with focused tests, inspect the diff, and finish with accurate results and remaining limitations."
+	case fraction <= 0.5:
+		phase = "At least half the budget is used. For implementation tasks, prioritize a justified minimal production fix and its focused test over further broad investigation."
 	}
 	progressText := ""
 	if progress, ok := ctx.Value(runtimeProgressKey{}).(runtimeProgress); ok {
-		progressText = fmt.Sprintf("\nObserved via apply_patch: %d production edits, %d test-only edits; %d tool calls since the last observed production edit. Shell edits are not counted; inspect the diff if needed.", progress.ProductionEdits, progress.TestEdits, progress.CallsSinceEdit)
-		if progress.ProductionEdits == 0 && progress.CallsSinceEdit >= 8 {
+		progressText = fmt.Sprintf("\nObserved via apply_patch: %d production edits, %d test-only edits; %d tool calls and %d successful command(s) since the last observed production edit. Shell edits are not counted; inspect the diff if needed.", progress.ProductionEdits, progress.TestEdits, progress.CallsSinceEdit, progress.ExecOKAfterEdit)
+		switch {
+		case progress.ProductionEdits > 0 && progress.ExecOKAfterEdit > 0:
+			progressText += " A production change is in place and at least one command run after it exited successfully. If those runs verified the requested behavior, finish now with an accurate summary of the change and its verification; do not expand scope, refactor, or keep investigating."
+		case progress.ProductionEdits > 0 && progress.CallsSinceEdit >= 6:
+			progressText += " A production change exists but no successful command has been observed after it. Run one focused verification of the changed behavior, or make the necessary follow-up edit, then finish; stop broad exploration."
+		case progress.ProductionEdits == 0 && progress.CallsSinceEdit >= 8:
 			progressText += " If the user requested an implementation, exploration has not yet produced an observed production fix. Avoid another broad search. Use the current hypothesis to make the smallest justified production change, or run one focused reproduction to resolve the specific remaining uncertainty. Adding a test alone does not fix the implementation."
 		}
 	}
 	return fmt.Sprintf(`[runtime budget; replaces the previous notice]
 Remaining model requests: %s. Remaining tokens: %s. Deadline remaining: %s. Missing usage reports: %d.
 Follow the user's requested scope. For coding tasks: %s%s
-Use the prepared local toolchain and cached dependencies. Avoid downloading comparison versions or repeatedly repairing unrelated environment problems. After repeated setup errors, record the blocker and use another local way to verify the hypothesis. Keep reads narrow; retrieve older evidence by artifact_id when needed. Never claim a test passed without its actual result.`, calls, tokens, clock, missing, phase, progressText)
+Use the prepared local toolchain and cached dependencies. Avoid downloading comparison versions or repeatedly repairing unrelated environment problems. After repeated setup errors, record the blocker and use another local way to verify the hypothesis. Keep reads narrow; retrieve older evidence by artifact_id when needed. Never claim a test passed without its actual result.`, calls, tokens, clock, missing, phase, progressText), final
 }
 
 func (b *ModelBudget) emit(event Event) {
