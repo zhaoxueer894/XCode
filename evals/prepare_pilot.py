@@ -69,11 +69,12 @@ def instruction(task: dict, row: dict) -> str:
     )
 
 
-def prepare(test_policy: str = "protected-upstream", manifest_path: Path | None = None) -> None:
+def prepare(test_policy: str = "protected-upstream", manifest_path: Path | None = None, records_dir: Path | None = None) -> None:
     manifest = json.loads((manifest_path or ROOT/"evals/pilot-five.json").read_text(encoding="utf-8"))
     if (OUTPUT/"tasks").exists() and (OUTPUT/"harbor").exists():
         raise RuntimeError("task directory belongs to an existing run; use --output with a fresh directory")
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    records = (records_dir or ROOT/".eval/pilot-five/source-records").resolve()
     for name, revision in [("multi-swe-bench",manifest["harness_revisions"]["multi_swe_bench"]), ("swe-bench",manifest["harness_revisions"]["swebench"])]:
         actual = subprocess.check_output(["git", "-C", str(SOURCES/name), "rev-parse", "HEAD"],text=True).strip()
         if actual != revision:
@@ -83,7 +84,7 @@ def prepare(test_policy: str = "protected-upstream", manifest_path: Path | None 
     locked_images = {}
     for task in manifest["tasks"]:
         name = task["id"]
-        source_record = ROOT/".eval/pilot-five/source-records"/(name+".json")
+        source_record = records/(name+".json")
         data = source_record.read_bytes()
         if sha(data) != task["record_sha256"]:
             raise RuntimeError("frozen source record changed: " + name)
@@ -180,7 +181,8 @@ if __name__=="__main__":
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output",type=Path,default=OUTPUT)
     parser.add_argument("--manifest",type=Path,default=ROOT/"evals/pilot-five.json")
+    parser.add_argument("--records-dir",type=Path,default=None,help="pinned source records directory (defaults to the pilot-five records)")
     parser.add_argument("--test-policy",choices=["reject-existing","protected-upstream"],default="protected-upstream")
     args=parser.parse_args()
     OUTPUT=args.output.resolve()
-    prepare(args.test_policy,args.manifest)
+    prepare(args.test_policy,args.manifest,args.records_dir)

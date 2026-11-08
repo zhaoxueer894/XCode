@@ -28,9 +28,11 @@ def main() -> None:
     parser.add_argument("--proxy", help="optional HTTP proxy for public downloads and Git")
     parser.add_argument("--skip-docker", action="store_true", help="fetch data on another OS before pulling images on Linux")
     parser.add_argument("--manifest",type=Path,default=ROOT/"evals/pilot-five.json")
+    parser.add_argument("--records-dir",type=Path,default=OUTPUT/"source-records",help="where pinned source records are verified into")
     args = parser.parse_args()
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({"http":args.proxy,"https":args.proxy})) if args.proxy else urllib.request.build_opener()
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+    records = args.records_dir.resolve()
     git = ["git"] + (["-c", "http.proxy=" + args.proxy] if args.proxy else [])
     for name, repo, revision in [
         ("multi-swe-bench", "multi-swe-bench/multi-swe-bench", manifest["harness_revisions"]["multi_swe_bench"]),
@@ -72,7 +74,7 @@ def main() -> None:
         data = json.dumps(row, indent=2, ensure_ascii=False).replace("\n", "\r\n").encode("utf-8")
         if hashlib.sha256(data).hexdigest() != task["record_sha256"]:
             raise RuntimeError("pinned source record checksum mismatch: " + task["id"])
-        destination = OUTPUT/"source-records"/(task["id"]+".json")
+        destination = records/(task["id"]+".json")
         destination.parent.mkdir(parents=True, exist_ok=True)
         if destination.exists() and destination.read_bytes() != data:
             raise RuntimeError("refusing to replace a different source record")
