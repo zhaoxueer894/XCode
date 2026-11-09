@@ -70,6 +70,14 @@ func runCLI(args []string) (runErr error) {
 		return nil
 	}
 
+	// 可选的用户级 PATH 安装（不装也始终可以 bin/xcode.exe 直接启动）。
+	if len(args) > 0 && args[0] == "install" {
+		if err := runInstall(args[1:]); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	// 长任务故障评测子命令（三策略对照 + replay）。
 	if len(args) > 0 && args[0] == "eval-fault" {
 		faultContext, stop := signal.NotifyContext(context.Background(), os.Interrupt)
