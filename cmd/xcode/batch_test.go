@@ -139,12 +139,14 @@ func TestBatchDisablesDelegateAndPreservesBudgetFailure(t *testing.T) {
 	})
 	_ = os.WriteFile(filepath.Join(root, "README.md"), []byte("hello"), 0o600)
 	_ = os.WriteFile(filepath.Join(root, "go.mod"), []byte("module fixture\n"), 0o600)
-	args = append(args, "--max-model-calls", "2", "read README.md")
+	// 最后允许的请求会禁用并剪除工具调用，请求数上限不再导致 ErrBudget；
+	// 预算耗尽路径改由 token 上限在下一次请求前触发（每请求 7 token）。
+	args = append(args, "--max-tokens", "14", "read README.md")
 	if err := runCLI(args); !errors.Is(err, harness.ErrBudget) {
 		t.Fatalf("error = %v", err)
 	}
-	if toolBearingRequests != 1 {
-		t.Fatalf("expected exactly one tool-bearing request before the final one, got %d", toolBearingRequests)
+	if toolBearingRequests != 2 {
+		t.Fatalf("expected two tool-bearing requests before the budget check, got %d", toolBearingRequests)
 	}
 	got := readBatchResult(t, root)
 	if got.Status != "stopped" || got.StopReason != harness.StopBudget || got.Model.Calls != 2 {

@@ -330,3 +330,53 @@ func TestExplorationGateNarrowsToolsUntilFirstProductionEdit(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGatePrunesWithheldToolCallsFromResponse(t *testing.T) {
+	registry, err := harness.NewRegistry(
+		staticTool{name: "read_file", output: "content"},
+		staticTool{name: "search_text", output: "hits"},
+		staticTool{name: "apply_patch", output: "updated"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var executed []string
+	events := harness.EventSinkFunc(func(e harness.Event) {
+		if e.Kind == harness.ToolStarted {
+			executed = append(executed, e.Tool)
+		}
+	})
+	// 第 7 次请求进入 level-1 门禁（剩余 6/12）：声明里没有 search_text，
+	// 但模型仍按"记忆"返回一次 search_text 调用——它必须被剪掉、不进执行。
+	step := 0
+	model := modelFunc(func(_ context.Context, _ []harness.Message, tools []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+		step++
+		if step >= 8 {
+			return harness.ModelResponse{Content: "done", Usage: harness.Usage{TotalTokens: 100}}, nil
+		}
+		calls := []harness.ToolCall{{
+			ID: fmt.Sprintf("leak-%d", step), Name: "read_file",
+			Arguments: json.RawMessage(fmt.Sprintf(`{"path":"f%d.go"}`, step)),
+		}}
+		if step == 7 {
+			calls = append(calls, harness.ToolCall{
+				ID: "leak-search", Name: "search_text",
+				Arguments: json.RawMessage(`{"pattern":"x"}`),
+			})
+		}
+		return harness.ModelResponse{ToolCalls: calls, Usage: harness.Usage{TotalTokens: 100}}, nil
+	})
+	budget := harness.NewModelBudget(12, 1300, events)
+	agent := harness.NewAgent(budget.Wrap(model, "agent"), registry, 12, events)
+	if _, err := agent.Run(context.Background(), "implement the requested fix"); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range executed {
+		if name == "search_text" {
+			t.Fatalf("withheld tool leaked into execution: %v", executed)
+		}
+	}
+	if len(executed) != 7 {
+		t.Fatalf("expected 7 read_file executions, got %v", executed)
+	}
+}

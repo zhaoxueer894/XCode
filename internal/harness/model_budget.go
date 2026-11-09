@@ -60,8 +60,10 @@ func (m *budgetModel) Generate(ctx context.Context, messages []Message, tools []
 	spent, missing := b.usage.TotalTokens, b.missingUsage
 	b.mu.Unlock()
 	id := fmt.Sprintf("model-%06d", call)
+	finalRequest, gate := false, 0
 	if m.purpose != "summary" {
-		notice, finalRequest, gate := b.guidance(ctx, call, spent, missing)
+		notice, final, g := b.guidance(ctx, call, spent, missing)
+		finalRequest, gate = final, g
 		input := make([]Message, 0, len(messages)+1)
 		input = append(input, Message{Role: "system", Content: notice})
 		messages = append(input, messages...)
@@ -90,6 +92,12 @@ func (m *budgetModel) Generate(ctx context.Context, messages []Message, tools []
 	}))
 	if !known && (response.Usage != (Usage{})) {
 		usage, known = response.Usage, true
+	}
+	// 声明侧收窄不够：Provider（尤其带思考续传的）可能"记得"未声明的工具并
+	// 继续调用。在响应进入 Agent 循环前剪掉未声明工具的调用，否则门禁与最后
+	// 请求的禁用在执行侧被绕过。finalRequest 时 advertised 为 nil，全部剪除。
+	if err == nil && (finalRequest || gate > 0) {
+		response.ToolCalls = pruneWithheldToolCalls(response.ToolCalls, tools)
 	}
 	if usage.TotalTokens == 0 {
 		usage.TotalTokens = usage.InputTokens + usage.OutputTokens
@@ -131,6 +139,25 @@ func restrictExplorationTools(specs []ToolSpec, gate int) []ToolSpec {
 	for _, spec := range specs {
 		if !blocked[spec.Name] {
 			kept = append(kept, spec)
+		}
+	}
+	return kept
+}
+
+// pruneWithheldToolCalls 移除不在当次声明列表里的工具调用（final 时全部移除）。
+// 剪除发生在响应进入消息历史之前，助手消息不会包含被剪调用，协议保持一致。
+func pruneWithheldToolCalls(calls []ToolCall, advertised []ToolSpec) []ToolCall {
+	if len(calls) == 0 {
+		return calls
+	}
+	allowed := make(map[string]bool, len(advertised))
+	for _, spec := range advertised {
+		allowed[spec.Name] = true
+	}
+	kept := make([]ToolCall, 0, len(calls))
+	for _, call := range calls {
+		if allowed[call.Name] {
+			kept = append(kept, call)
 		}
 	}
 	return kept
