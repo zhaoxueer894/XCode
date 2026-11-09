@@ -54,7 +54,6 @@ type runRecordConfig struct {
 	Thinking        string `json:"thinking,omitempty"`
 	ReasoningEffort string `json:"reasoning_effort,omitempty"`
 	MaxOutputTokens int    `json:"max_output_tokens,omitempty"`
-	ModelKeyIndex   int    `json:"model_key_index"`
 	DoomLoopLimit   int    `json:"doom_loop_limit"`
 	Timeout         string `json:"timeout"`
 	NoDelegate      bool   `json:"no_delegate"`

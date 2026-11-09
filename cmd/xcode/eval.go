@@ -17,6 +17,7 @@ import (
 
 	"xcode/internal/artifactstore" // 把本轮 Eval 的完整工具结果保存在 Run 输出目录。
 	"xcode/internal/checkpoint"    // 使只读评测也复用统一管线依赖。
+	"xcode/internal/config"        // 评测与实际运行共用同一套配置取值链。
 	"xcode/internal/contextmgr"    // 投影管理器与纪元。
 	"xcode/internal/eval"
 	"xcode/internal/executor" // 与普通 CLI 共用策略执行入口。
@@ -69,6 +70,11 @@ func runEval(ctx context.Context, args []string) error {
 	if flags.NArg() != 0 {
 		return fmt.Errorf("xcode eval does not accept a prompt")
 	}
+	// eval 同样读取配置文件（全局 > 项目），保证评测与实际运行取同一套模型设置。
+	appConfig, configErr := config.Load(".")
+	if configErr != nil {
+		return configErr
+	}
 
 	// ========== 2. 装配评测依赖 ==========
 	// 读取并校验任务集；catalogHash是tasks.json内容的SHA-256，
@@ -78,7 +84,7 @@ func runEval(ctx context.Context, args []string) error {
 		return err
 	}
 	// 复用run子命令的模型构造逻辑，保证评测与实际运行使用同一套Model实现
-	selectedModel, err := buildModel(*provider)
+	selectedModel, err := buildModel(appConfig, *provider)
 	if err != nil {
 		return err
 	}
@@ -93,12 +99,12 @@ func runEval(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	// 记录真实模型名：demo提供方没有远端模型；bailian则读环境变量（默认defaultBailianModel）
+	// 记录真实模型名：demo提供方没有远端模型；真实供应商来自配置取值链。
 	modelName := "demo"
 	providerEndpoint := ""
 	if strings.EqualFold(*provider, "bailian") {
-		modelName = envOrDefault("DASHSCOPE_MODEL", defaultBailianModel)
-		providerEndpoint = envOrDefault("DASHSCOPE_BASE_URL", defaultBailianBaseURL)
+		bailianRun := bailianSettings(appConfig, 2)
+		modelName, providerEndpoint = bailianRun.Model, bailianRun.BaseURL
 	}
 	harnessVersion, err := executableHarnessVersion()
 	if err != nil {

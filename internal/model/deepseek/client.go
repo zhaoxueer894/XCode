@@ -14,7 +14,7 @@ type Client = chatcompletions.Client
 func New(config Config) (*Client, error) {
 	config.Provider = "deepseek"
 	if strings.TrimSpace(config.APIKey) == "" {
-		return nil, fmt.Errorf("DEEPSEEK_API_KEY or --model-config is required")
+		return nil, fmt.Errorf("deepseek requires an API key: set deepseek-api-key in ~/.xcode/config or env DEEPSEEK_API_KEY")
 	}
 	if config.BaseURL == "" {
 		config.BaseURL = "https://api.deepseek.com"

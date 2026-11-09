@@ -219,8 +219,7 @@ func TestBatchParentAndChildShareCallLimit(t *testing.T) {
 func TestBatchIsolatedIgnoresAmbientConfig(t *testing.T) {
 	root, args := batchFixture(t, nil, nil)
 	_ = os.Mkdir(filepath.Join(root, ".xcode"), 0o700)
-	_ = os.WriteFile(filepath.Join(root, ".xcode/config"), []byte("provider=unknown\n"), 0o600)
-	_ = os.WriteFile(filepath.Join(root, ".env"), []byte("DASHSCOPE_MODEL=wrong-model\n"), 0o600)
+	_ = os.WriteFile(filepath.Join(root, ".xcode/config"), []byte("provider=unknown\nbailian-model=wrong-model\n"), 0o600)
 	if err := runCLI(append(args, "--isolated", "task")); err != nil {
 		t.Fatal(err)
 	}
@@ -279,9 +278,9 @@ func TestBatchDeepseekConfigAndThinkingContinuation(t *testing.T) {
 		return response, nil
 	})
 	_ = os.WriteFile(filepath.Join(root, "README.md"), []byte("hello"), 0o600)
-	config := filepath.Join(root, "deepseek.txt")
-	_ = os.WriteFile(config, []byte("https://api.deepseek.com\nhttps://api.deepseek.com/anthropic\nmodel: deepseek-flash\napi-key:\nsk-test-only-00000000000000000000\nsk-test-only-11111111111111111111\n"), 0o600)
-	if err := runCLI(append(args, "--provider", "deepseek", "--model-config", config, "read README.md")); err != nil {
+	_ = os.Mkdir(filepath.Join(root, ".xcode"), 0o700)
+	_ = os.WriteFile(filepath.Join(root, ".xcode/config"), []byte("deepseek-api-key=sk-test-only-00000000000000000000\ndeepseek-model=deepseek-flash\n"), 0o600)
+	if err := runCLI(append(args, "--provider", "deepseek", "read README.md")); err != nil {
 		t.Fatal(err)
 	}
 	got := readBatchResult(t, root)
@@ -290,6 +289,6 @@ func TestBatchDeepseekConfigAndThinkingContinuation(t *testing.T) {
 	}
 	data, _ := os.ReadFile(filepath.Join(root, "result.json"))
 	if strings.Contains(string(data), "sk-test-only-") {
-		t.Fatal("credential document leaked into result")
+		t.Fatal("config credential leaked into result")
 	}
 }

@@ -7,9 +7,9 @@ package main
 
 import (
 	"fmt"     // 构造错误。
-	"os"      // 读取分类器 Key 的环境变量。
 	"strings" // 归一化后端名与选项。
 
+	"xcode/internal/config"        // 供应商密钥与端点的统一取值链。
 	"xcode/internal/contextmgr"    // 投影管理器与决策器。
 	"xcode/internal/harness"       // Model 与协议类型。
 	"xcode/internal/model/bailian" // local 分类器的独立聊天客户端。
@@ -19,15 +19,11 @@ import (
 // resolveLocalClassifier 解析 local 分类后端使用的聊天模型：
 // 配置了独立端点+模型时构建专用客户端（与主模型解耦），否则复用主模型；
 // demo 主模型不具备真实分类能力且无独立配置时返回 nil（不采集 shadow）。
-func resolveLocalClassifier(provider string, mainModel harness.Model, endpoint, model, keyEnv string) (harness.Model, error) {
+func resolveLocalClassifier(cfg config.Config, provider string, mainModel harness.Model, endpoint, model string) (harness.Model, error) {
 	if strings.TrimSpace(endpoint) != "" && strings.TrimSpace(model) != "" {
-		resolvedKeyEnv := strings.TrimSpace(keyEnv)
-		if resolvedKeyEnv == "" {
-			resolvedKeyEnv = "DASHSCOPE_API_KEY"
-		}
-		key := strings.TrimSpace(os.Getenv(resolvedKeyEnv))
+		key := classifierKey(cfg)
 		if key == "" {
-			return nil, fmt.Errorf("typed classifier key env %s is empty", resolvedKeyEnv)
+			return nil, fmt.Errorf("classifier API key is empty (config bailian-api-key or env DASHSCOPE_API_KEY)")
 		}
 		return bailian.New(bailian.Config{
 			APIKey:  key,
@@ -44,13 +40,14 @@ func resolveLocalClassifier(provider string, mainModel harness.Model, endpoint, 
 // mountTypedShadow 把类型化决策器挂到投影管理器上；backend 为 jev 或 local（默认）。
 // effective=false 挂为 shadow（判定只记录不生效）；effective=true 挂为生效决策器（拍板，
 // 失败/低置信度自动回退规则）。只负责"能跑"的接线；是否启用由调用方的 flag/配置决定。
-func mountTypedShadow(manager *contextmgr.Manager, backend, provider string, mainModel harness.Model, endpoint, model, keyEnv string, effective bool) error {
+func mountTypedShadow(manager *contextmgr.Manager, cfg config.Config, backend, provider string, mainModel harness.Model, endpoint, model string, effective bool) error {
 	decider := func(classify contextmgr.ClassificationFunc) *contextmgr.TypedModelDecider {
 		return contextmgr.NewTypedModelDecider(classify, 0.6)
 	}
 	switch strings.ToLower(strings.TrimSpace(backend)) {
 	case "jev":
-		client, err := jev.New(os.Getenv("TYPESAFE_API_KEY"), os.Getenv("TYPESAFE_ENDPOINT"), os.Getenv("TYPESAFE_MODEL"))
+		key, jevEndpoint, jevModel := typesafeSettings(cfg)
+		client, err := jev.New(key, jevEndpoint, jevModel)
 		if err != nil {
 			return err
 		}
@@ -61,7 +58,7 @@ func mountTypedShadow(manager *contextmgr.Manager, backend, provider string, mai
 		}
 		return nil
 	default: // local：聊天 LLM 分类（Jev 诞生前的常用方案，作为对照基线）。
-		classifier, err := resolveLocalClassifier(provider, mainModel, endpoint, model, keyEnv)
+		classifier, err := resolveLocalClassifier(cfg, provider, mainModel, endpoint, model)
 		if err != nil {
 			return err
 		}
