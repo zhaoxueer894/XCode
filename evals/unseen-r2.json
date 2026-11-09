@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "execution_environment": {
+    "cpus": 2,
+    "memory_mb": 4096,
+    "go_env": {
+      "GOMAXPROCS": "2",
+      "GOFLAGS": "-p=2"
+    },
+    "reason": "Align pre-cgroup-aware Go runtimes and package parallelism to the actual container CPU quota; tests and upstream graders are unchanged."
+  },
+  "selection_policy": "Second unseen round (validating the exploration gate), selected mechanically before any calibration or model run. Scope is the four repos that qualified in the first round: cli, dayjs, sympy, django (go-zero and express are exhausted in the pinned datasets; axios and grpc stay excluded by their frozen environment audits). Each contributes its first THREE unused tasks past the round-one consumed floors (cli>302, dayjs>337, sympy>12096, django>7530) with a non-empty official FAIL_TO_PASS. Audit order is round-robin [cli, dayjs, sympy, django]; the frozen set is the first TEN that pass gold/empty calibration, no replacement after calibration begins. Grading rule protected-upstream is fixed before the run. First model exposure to every task in the pool.",
+  "harness_revisions": {
+    "multi_swe_bench": "24f493f8a103e72312ded4f6b9c89f081d69cb09",
+    "swebench": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+    "swebench_tasks": "3d07b464b7b311a0cbfb5ed5b2d8a3b96f84a33d",
+    "harbor": "0.25.0"
+  },
+  "agent": {
+    "model": "deepseek-flash",
+    "thinking": "enabled",
+    "reasoning_effort": "high",
+    "no_delegate": true,
+    "max_model_calls": 100,
+    "max_tokens": 200000,
+    "max_steps": 100,
+    "timeout_sec": 1200,
+    "max_output_tokens": 8192,
+    "provider_retries": 0,
+    "context_strategy": "bounded",
+    "context_budget": 6000,
+    "runtime_budget_guidance": true,
+    "runtime_progress_guidance": true,
+    "early_wrap_up_and_final_request_tools_off": true
+  },
+  "frozen_at_utc": "2026-11-09T15:21:27.907675+00:00",
+  "tasks": [
+    {
+      "id": "cli__cli-352",
+      "language": "go",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "cli/cli",
+      "base_commit": "ca7a9364fd56bfa9e33d60e459eb9c1ad91511b9",
+      "workspace": "/home/cli",
+      "record_sha256": "81a81c5bacb6fe663e453c9f5a4d7ac4ec3ba9b3e2220ad2eaa65fd7e06893ea",
+      "f2p_count": 1,
+      "p2p_count": 126,
+      "dataset_file": "cli__cli_dataset.jsonl",
+      "image": "mswebench/cli_m_cli:pr-352",
+      "image_digest": "mswebench/cli_m_cli@sha256:7d1991837661c15aab839ceaaf744415729706eb39280591b2f42b0dbb20fd85"
+    },
+    {
+      "id": "iamkun__dayjs-379",
+      "language": "javascript",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "iamkun/dayjs",
+      "base_commit": "142b763ffa69ba116827c99cf10b661865b9dd20",
+      "workspace": "/home/dayjs",
+      "record_sha256": "11f5abdd49bdd917fe03f884f02f917e2b1e79b5633e9ce15d0479ff2e6aff5b",
+      "f2p_count": 1,
+      "p2p_count": 22,
+      "dataset_file": "iamkun__dayjs_dataset.jsonl",
+      "image": "mswebench/iamkun_m_dayjs:pr-379",
+      "image_digest": "mswebench/iamkun_m_dayjs@sha256:eb57bdf5257aa65584fe8391485dafc797bf086d8a5b36fe24a00145ec3012a1"
+    },
+    {
+      "id": "sympy__sympy-12419",
+      "language": "python",
+      "dataset": "SWE-bench/SWE-bench_Verified",
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "repository": "sympy/sympy",
+      "base_commit": "479939f8c65c8c2908bbedc959549a257a7c0b0b",
+      "workspace": "/testbed",
+      "record_sha256": "3d911ef6676e77ee34cf582c7b165a6965428e5e77199c95eb22203593224e8e",
+      "f2p_count": 1,
+      "p2p_count": 25,
+      "image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-12419:latest",
+      "image_digest": "swebench/sweb.eval.x86_64.sympy_1776_sympy-12419@sha256:f78a02916b66645a5325eb515192081890cfc77a103202d5b611d3b2d4b77893"
+    },
+    {
+      "id": "django__django-9296",
+      "language": "python",
+      "dataset": "SWE-bench/SWE-bench_Verified",
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "repository": "django/django",
+      "base_commit": "84322a29ce9b0940335f8ab3d60e55192bef1e50",
+      "workspace": "/testbed",
+      "record_sha256": "ea60a88ccf1f81b23900b443b78847702bcf7cc1ba83c3695bc232aabbb3dc60",
+      "f2p_count": 1,
+      "p2p_count": 20,
+      "image": "swebench/sweb.eval.x86_64.django_1776_django-9296:latest",
+      "image_digest": "swebench/sweb.eval.x86_64.django_1776_django-9296@sha256:c63adb629b6dafbb12aa506778e27b02f06387c64df3f2cebaba47f9b5f26150"
+    },
+    {
+      "id": "cli__cli-362",
+      "language": "go",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "cli/cli",
+      "base_commit": "c27d7807a06a01c1248f85957cba5bf23d16aae0",
+      "workspace": "/home/cli",
+      "record_sha256": "6ff716969671e6f11db3af091726eb62a20fc541a76e5af14dad302764b3f478",
+      "f2p_count": 1,
+      "p2p_count": 87,
+      "dataset_file": "cli__cli_dataset.jsonl",
+      "image": "mswebench/cli_m_cli:pr-362",
+      "image_digest": "mswebench/cli_m_cli@sha256:33279623ad8b1d2d7852ee455897eb22115193ed5f643900a80102536fb3a5f0"
+    },
+    {
+      "id": "iamkun__dayjs-556",
+      "language": "javascript",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "iamkun/dayjs",
+      "base_commit": "566873acbdb562ff6354d255579eb323777d86f2",
+      "workspace": "/home/dayjs",
+      "record_sha256": "ec3b0f30031b3966c83ae6a252c8e4695a1835dfb7114377e8c92cc319d9274a",
+      "f2p_count": 2,
+      "p2p_count": 35,
+      "dataset_file": "iamkun__dayjs_dataset.jsonl",
+      "image": "mswebench/iamkun_m_dayjs:pr-556",
+      "image_digest": "mswebench/iamkun_m_dayjs@sha256:d241419138e58a1164d097e58d853ffe255ae6d6114549e59129338711bcb402"
+    },
+    {
+      "id": "sympy__sympy-12481",
+      "language": "python",
+      "dataset": "SWE-bench/SWE-bench_Verified",
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "repository": "sympy/sympy",
+      "base_commit": "c807dfe7569692cad24f02a08477b70c1679a4dd",
+      "workspace": "/testbed",
+      "record_sha256": "4ff3c9b6a5326fa481fb0a4a22fcc2eb9668c3c1d29a66b0929d48aea0ee791d",
+      "f2p_count": 1,
+      "p2p_count": 7,
+      "image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-12481:latest",
+      "image_digest": "swebench/sweb.eval.x86_64.sympy_1776_sympy-12481@sha256:bb526b7d1c4a160d96d3ab925a6b382194a19bf77a72df71e220ce19fe924e7f"
+    },
+    {
+      "id": "cli__cli-402",
+      "language": "go",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "cli/cli",
+      "base_commit": "c27d7807a06a01c1248f85957cba5bf23d16aae0",
+      "workspace": "/home/cli",
+      "record_sha256": "ad03c15a23783aa742c11d1f9dcb7babe89b29924e6b7bdb0bb822f1943231bd",
+      "f2p_count": 1,
+      "p2p_count": 51,
+      "dataset_file": "cli__cli_dataset.jsonl",
+      "image": "mswebench/cli_m_cli:pr-402",
+      "image_digest": "mswebench/cli_m_cli@sha256:25ce9d8cc24d92236306afbd5fcb9abe78df41e06747eca1049a9df3425465fe"
+    },
+    {
+      "id": "iamkun__dayjs-569",
+      "language": "javascript",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "iamkun/dayjs",
+      "base_commit": "ffffacffd02132aefa0ed811092a02eb7f80d10f",
+      "workspace": "/home/dayjs",
+      "record_sha256": "d84e8a2592dd33662bcf0fef20c9a6d869896f6191db099a8d422a00c1b465c9",
+      "f2p_count": 1,
+      "p2p_count": 37,
+      "dataset_file": "iamkun__dayjs_dataset.jsonl",
+      "image": "mswebench/iamkun_m_dayjs:pr-569",
+      "image_digest": "mswebench/iamkun_m_dayjs@sha256:d3d6639b1ac7e955f624fcf32a44bd4ed9ce4b67ecb149b6d9343f319e09e8f9"
+    },
+    {
+      "id": "sympy__sympy-12489",
+      "language": "python",
+      "dataset": "SWE-bench/SWE-bench_Verified",
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "repository": "sympy/sympy",
+      "base_commit": "aa9780761ad8c3c0f68beeef3a0ce5caac9e100b",
+      "workspace": "/testbed",
+      "record_sha256": "6d9c133b5af4abf8ab2d384f80598094f3caa730df8dedfe2b15f91c975a91a1",
+      "f2p_count": 1,
+      "p2p_count": 8,
+      "image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-12489:latest",
+      "image_digest": "swebench/sweb.eval.x86_64.sympy_1776_sympy-12489@sha256:da745b29eda94f68cb55a6648fb5767ea6709c242d7cc1c93caee41256ca02c6"
+    }
+  ],
+  "calibration": {
+    "gold_jobs": [
+      "gold-v3"
+    ],
+    "empty_jobs": [
+      "empty-v1"
+    ],
+    "rule": "first TEN tasks in frozen order whose gold passes and empty fails; no replacement",
+    "excluded": [
+      {
+        "id": "django__django-10097",
+        "order": 8,
+        "reason": "gold patch did not pass in the no-network verifier"
+      }
+    ],
+    "audit_file": ".eval/unseen-r2/calibration-audit.json"
+  }
+}

@@ -43,26 +43,47 @@ AGENT = {
     "early_wrap_up_and_final_request_tools_off": True,
 }
 
-SELECTION_POLICY = (
-    "Unseen-task round selected mechanically before any calibration or model run. "
-    "Pilot repos contribute ALL unused tasks past their consumed PR floors with a "
-    "non-empty official FAIL_TO_PASS (go-zero>1969 cap 3, express>3695 cap 3); the "
-    "pinned datasets cannot fill 12 from pilot repos alone (flask has one used "
-    "instance, requests tops out at the used PR), so scope extends in a fixed order "
-    "until the pool reaches 12: cli/cli(2), axios(2), dayjs(2), sympy(2), django(1). "
-    "grpc/grpc-go stays excluded by its frozen environment audit (expired test "
-    "certificate, missing host hardware file). Audit order is round-robin over scope "
-    "order with ascending PR within a repo; the frozen evaluation set is the first "
-    "TEN tasks of that order that pass gold/empty calibration, capped at 10, with "
-    "no replacement after calibration begins. The grading rule (protected-upstream) "
-    "is fixed before the run. This round is the first model exposure to every task "
-    "in the pool."
-)
+SELECTION_POLICIES = {
+    "ten": (
+        "Unseen-task round selected mechanically before any calibration or model run. "
+        "Pilot repos contribute ALL unused tasks past their consumed PR floors with a "
+        "non-empty official FAIL_TO_PASS (go-zero>1969 cap 3, express>3695 cap 3); the "
+        "pinned datasets cannot fill 12 from pilot repos alone (flask has one used "
+        "instance, requests tops out at the used PR), so scope extends in a fixed order "
+        "until the pool reaches 12: cli/cli(2), axios(2), dayjs(2), sympy(2), django(1). "
+        "grpc/grpc-go stays excluded by its frozen environment audit (expired test "
+        "certificate, missing host hardware file). Audit order is round-robin over scope "
+        "order with ascending PR within a repo; the frozen evaluation set is the first "
+        "TEN tasks of that order that pass gold/empty calibration, capped at 10, with "
+        "no replacement after calibration begins. The grading rule (protected-upstream) "
+        "is fixed before the run. This round is the first model exposure to every task "
+        "in the pool."
+    ),
+    "r2": (
+        "Second unseen round (validating the exploration gate), selected mechanically "
+        "before any calibration or model run. Scope is the four repos that qualified in "
+        "the first round: cli, dayjs, sympy, django (go-zero and express are exhausted "
+        "in the pinned datasets; axios and grpc stay excluded by their frozen "
+        "environment audits). Each contributes its first THREE unused tasks past the "
+        "round-one consumed floors (cli>302, dayjs>337, sympy>12096, django>7530) with a "
+        "non-empty official FAIL_TO_PASS. Audit order is round-robin [cli, dayjs, sympy, "
+        "django]; the frozen set is the first TEN that pass gold/empty calibration, no "
+        "replacement after calibration begins. Grading rule protected-upstream is fixed "
+        "before the run. First model exposure to every task in the pool."
+    ),
+}
 
 
 def main() -> None:
-    selection = json.loads((ROOT / ".eval/unseen-ten/selection.json").read_text(encoding="utf-8"))
-    digests = {item["id"]: item for item in json.loads((ROOT / ".eval/unseen-ten/digests.json").read_text(encoding="utf-8"))}
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--round", choices=sorted(SELECTION_POLICIES), required=True)
+    args = parser.parse_args()
+    round_dirs = {"ten": "unseen-ten", "r2": "unseen-r2"}
+    run_dir = ROOT / ".eval" / round_dirs[args.round]
+    selection = json.loads((run_dir / "selection.json").read_text(encoding="utf-8"))
+    digests = {item["id"]: item for item in json.loads((run_dir / "digests.json").read_text(encoding="utf-8"))}
     tasks = []
     for entry in selection["pool"]:
         pull = digests.get(entry["id"])
@@ -72,6 +93,8 @@ def main() -> None:
             "id": entry["id"],
             "language": entry["language"],
             "dataset": entry["dataset"],
+            "dataset_revision": ("56ff018c04a38e27ada1e9d0a6d5839a51f88f0d" if entry["language"] != "python"
+                                 else "78f471bf655a3137b2e8a75af1501690ec009ec3"),
             "repository": f"{org}/{repo}",
             "base_commit": entry["base_commit"],
             "workspace": entry["workspace"],
@@ -97,13 +120,13 @@ def main() -> None:
             "go_env": {"GOMAXPROCS": "2", "GOFLAGS": "-p=2"},
             "reason": "Align pre-cgroup-aware Go runtimes and package parallelism to the actual container CPU quota; tests and upstream graders are unchanged.",
         },
-        "selection_policy": SELECTION_POLICY,
+        "selection_policy": SELECTION_POLICIES[args.round],
         "harness_revisions": HARNESS_REVISIONS,
         "agent": AGENT,
         "frozen_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "tasks": tasks,
     }
-    output = ROOT / "evals/unseen-ten-candidates.json"
+    output = ROOT / f"evals/unseen-{args.round}-candidates.json"
     if output.exists():
         raise RuntimeError("candidate manifest already frozen; do not regenerate")
     output.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

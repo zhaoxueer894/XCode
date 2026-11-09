@@ -135,13 +135,14 @@ def main() -> None:
     parser.add_argument("--empty-job",default="empty-v4")
     parser.add_argument("--agent-job",default="xcode-v1")
     parser.add_argument("--credentials-file",type=Path)
+    parser.add_argument("--concurrency",type=int,default=2,help="parallel trials per harbor job")
     parser.add_argument("--run-root",type=Path,default=OUTPUT)
     parser.add_argument("--manifest",type=Path,default=MANIFEST)
     args=parser.parse_args()
     OUTPUT=args.run_root.resolve()
     MANIFEST=args.manifest.resolve()
     if args.phase=="empty":
-        run_job(args.empty_job,OUTPUT/"tasks","evals.harbor_agent:EmptyPatchAgent",{},2)
+        run_job(args.empty_job,OUTPUT/"tasks","evals.harbor_agent:EmptyPatchAgent",{},args.concurrency)
     elif args.phase=="agent":
         if not args.credentials_file or not args.credentials_file.is_file():
             raise ValueError("provide the existing external credential document")
@@ -162,7 +163,7 @@ def main() -> None:
             "workspace":"auto","conda_env":"auto","no_delegate":True,
             "context_strategy":budget.get("context_strategy","none"),"context_budget":budget.get("context_budget",12000),
             "max_model_calls":budget["max_model_calls"],"max_tokens":budget["max_tokens"],
-            "max_steps":budget["max_steps"],"timeout_sec":budget["timeout_sec"]},2)
+            "max_steps":budget["max_steps"],"timeout_sec":budget["timeout_sec"]},args.concurrency)
     report(args.gold_job,args.empty_job,args.agent_job)
 
 

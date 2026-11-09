@@ -17,7 +17,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
-    selection = json.loads((ROOT / ".eval/unseen-ten/selection.json").read_text(encoding="utf-8"))
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--round", required=True, help="round key matching select_unseen.py")
+    args = parser.parse_args()
+    round_dirs = {"ten": "unseen-ten", "r2": "unseen-r2"}
+    run_dir = ROOT / ".eval" / round_dirs[args.round]
+    selection = json.loads((run_dir / "selection.json").read_text(encoding="utf-8"))
     results = []
     for task in selection["pool"]:
         image = task["image"]
@@ -33,7 +40,7 @@ def main() -> None:
         except subprocess.CalledProcessError as error:
             print(f"pull failed for {image}: {error}", file=sys.stderr, flush=True)
         results.append({"id": task["id"], "image": image, "digest": digest})
-    output = ROOT / ".eval/unseen-ten/digests.json"
+    output = run_dir / "digests.json"
     output.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
     ok = sum(1 for item in results if item["digest"])
     print(json.dumps({"pulled": ok, "total": len(results), "output": str(output)}))
