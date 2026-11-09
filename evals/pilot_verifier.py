@@ -27,7 +27,8 @@ def load_native(tests: Path) -> None:
     namespace("swebench.harness", archive + "/swebench/harness")
     namespace("multi_swe_bench.harness", archive + "/multi_swe_bench/harness")
     namespace("multi_swe_bench.harness.repos", archive + "/multi_swe_bench/harness/repos")
-    for suffix in ["golang", "golang.grpc", "golang.zeromicro", "javascript", "javascript.expressjs"]:
+    for suffix in ["golang", "golang.cli", "golang.grpc", "golang.zeromicro",
+                   "javascript", "javascript.axios", "javascript.expressjs", "javascript.iamkun"]:
         namespace("multi_swe_bench.harness.repos." + suffix, archive + "/multi_swe_bench/harness/repos/" + suffix.replace(".", "/"))
 
 
@@ -40,7 +41,10 @@ def grade_multi(row: dict, log: str) -> dict:
     modules = {
         "grpc": ("golang.grpc.grpc_go", "GrpcGo"),
         "zeromicro": ("golang.zeromicro.go_zero", "GoZero"),
+        "cli": ("golang.cli.cli", "Cli"),
         "expressjs": ("javascript.expressjs.express", "Express"),
+        "axios": ("javascript.axios.axios", "Axios"),
+        "iamkun": ("javascript.iamkun.dayjs", "Dayjs"),
     }
     path, name = modules[row["org"]]
     cls = getattr(importlib.import_module("multi_swe_bench.harness.repos." + path), name)
@@ -71,7 +75,9 @@ def grade_python(row: dict, task: dict, log_path: Path, patch: str) -> dict:
     spec = TestSpec(instance_id=task["id"], image=task["image"], eval_script_list=[],
                     repo=task["repository"], version=row["version"],
                     FAIL_TO_PASS=names(row["FAIL_TO_PASS"]), PASS_TO_PASS=names(row["PASS_TO_PASS"]),
-                    log_parser="parse_log_flask" if "flask" in task["id"] else "parse_log_requests", eval_type="pass_and_fail")
+                    # The pinned dataset row carries each repo's official parser
+                    # (flask/requests/sympy/django differ); never guess from the id.
+                    log_parser=row["log_parser"], eval_type="pass_and_fail")
     result = get_eval_report(spec, {"instance_id": task["id"], "model_patch": patch}, str(log_path), True)[task["id"]]
     if not result["patch_successfully_applied"]:
         raise RuntimeError("official grader could not find usable test output")
