@@ -131,11 +131,13 @@ class XCodeAgent(BaseInstalledAgent):
         capture = ["python3", "/installed-agent/capture_patch.py", "--workspace", self.workspace,
                    "--base-commit", base, "--output", f"{logs}/model.patch"]
         # CLI budget/timeout failures still produce a patch and proceed to grading.
+        # Capture output persists next to the CLI logs: its stderr is the only way
+        # to diagnose a lost candidate patch after the container is destroyed.
         command = (
             (f"set -e\nsource /opt/miniconda3/bin/activate\nconda activate {shlex.quote(conda_env)}\n" if conda_env else "")
             + f"set +e\n{shlex.join(args)} >{shlex.quote(logs + '/stdout.txt')} 2>{shlex.quote(logs + '/stderr.txt')}\n"
             f"status=$?\nprintf '%s\\n' \"$status\" >{shlex.quote(logs + '/exit-code.txt')}\n"
-            f"{shlex.join(capture)}\n"
+            f"set -e\n{shlex.join(capture)} >{shlex.quote(logs + '/capture.txt')} 2>&1\n"
         )
         result = await environment.exec(command=command, cwd=self.workspace, env=env, timeout_sec=self.timeout_sec + 60)
         if result.return_code:

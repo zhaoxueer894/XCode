@@ -158,3 +158,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o .eval/pilot-rerun/bu
 ## 2026-11-09 未见题九题轮
 
 收尾修复(最后请求禁用工具 + 验证后催收尾)之后的第一个未见题集合。12 道候选按预定规则选出并冻结,金/空补丁校准排除 3 道(axios 两道官方测试依赖真实网络,django 一道空补丁意外通过),9 道进入模型运行:**4 道通过独立验收**,九道全部以 completed 干净结束,两道通过题在 7.1 万/9.5 万 token 提前收尾。失败主因回到"探索耗尽预算、没有生产修改"(4/5 道失败题)。冻结清单 `evals/unseen-ten.json`,完整分析见 [未见题轮报告](UNSEEN_TEN_REPORT.md)。
+
+## 2026-11-09 未见题第二轮(round 2)
+
+探索门禁的验证轮。10 道冻结题,公平完成的 6 道中 5 道通过(dayjs×3、sympy×2),全部早编辑、干净收尾;sympy 12489 暴露了门禁的执行侧漏洞——Provider"记得"未声明工具并继续调用,已修复为响应级剪除(`99bdd81`)。cli 三道因 DeepSeek 余额耗尽中断、django 一道补丁导出丢失,均保留为基础设施事件。完整分析见 [第二轮报告](UNSEEN_R2_REPORT.md)。
