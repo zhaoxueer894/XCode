@@ -120,6 +120,9 @@ func (s *Session) SetTurnLog(log *TurnLog) { s.agent.SetTurnLog(log) }
 // 使交互模式的自动压缩（含决策门控与 shadow 分类）与一次性命令行为一致。
 func (s *Session) SetContextManager(manager ContextManager) { s.agent.SetContextManager(manager) }
 
+// SetModel 会话中途替换主模型（REPL /model）；对话历史保留，下一轮生效。
+func (s *Session) SetModel(model Model) { s.agent.SetModel(model) }
+
 // Clear 清空会话历史和 L1 笔记，保留 L2 项目记忆。
 func (s *Session) Clear() {
 	s.messages = nil

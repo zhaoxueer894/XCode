@@ -60,6 +60,15 @@ func parseWizardChoice(input string) (string, bool) {
 	return "", false
 }
 
+// printProviderMenu 打印编号菜单与配置文件路径提示；首次向导与 REPL /model 共用。
+func printProviderMenu(title, globalPath string) {
+	fmt.Println(title)
+	for index, provider := range wizardProviders {
+		fmt.Printf("  %d) %s\n", index+1, wizardProviderLabel(provider))
+	}
+	fmt.Printf("使用其他模型或自定义端点：请编辑 %s\n", globalPath)
+}
+
 // runSetupWizard 在 provider 未出现在任何配置文件时介入：
 //  1. 已有某真实供应商的 Key（配置文件或环境变量）→ Y/n 确认是否从 demo 切换；
 //  2. 完全没有配置 → 编号菜单选择，写入全局 ~/.xcode/config。
@@ -99,11 +108,7 @@ func runSetupWizard(appConfig config.Config) (string, bool, error) {
 	}
 
 	// 首次运行菜单；菜单始终展示配置文件路径，用户随时知道去哪改。
-	fmt.Println("首次使用 XCode：选择要使用的模型")
-	for index, provider := range wizardProviders {
-		fmt.Printf("  %d) %s\n", index+1, wizardProviderLabel(provider))
-	}
-	fmt.Printf("使用其他模型或自定义端点：请编辑 %s\n", globalPath)
+	printProviderMenu("首次使用 XCode：选择要使用的模型", globalPath)
 	choice := ""
 	for attempt := 0; attempt < 3; attempt++ {
 		fmt.Print("输入序号并回车：")

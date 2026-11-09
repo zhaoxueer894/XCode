@@ -454,16 +454,7 @@ func runCLI(args []string) (runErr error) {
 	manager.SetNoteRecorder(notes)
 	// compaction 策略需要模型摘要器；demo 模型不具备总结能力，保持 nil 即回退占位符。
 	if !strings.EqualFold(*provider, "demo") {
-		selected := summaryModel
-		manager.SetSummarizer(func(ctx context.Context, oldText string) (string, error) {
-			response, err := selected.Generate(ctx, []harness.Message{
-				{Role: "user", Content: "请把下面这段 Agent 工作历史总结成不超过 200 字的要点，保留目标、已改文件、验证结果、失败与下一步：\n" + oldText},
-			}, nil, harness.ModelEventSinkFunc(func(harness.ModelEvent) {}))
-			if err != nil {
-				return "", err
-			}
-			return response.Content, nil
-		})
+		manager.SetSummarizer(chatSummarizer(summaryModel))
 	}
 
 	// 类型化 shadow 分类器（local/jev）——与故障评测路径共用 mountTypedShadow，
@@ -526,6 +517,24 @@ func runCLI(args []string) (runErr error) {
 		session := harness.NewSession(selectedModel, secure, *maxSteps, sink, projectMemo)
 		session.SetTurnLog(turnLog)
 		session.SetContextManager(manager)
+		// /model 热切换：重载配置、重建模型（含预算包装），并同步 delegate 子智能体
+		// （闭包按引用捕获 selectedModel，重新赋值即全链路生效）与压缩摘要器。
+		switchProvider := func(provider string) (string, error) {
+			fresh, loadErr := config.Load(*workspace)
+			if loadErr != nil {
+				return "", loadErr
+			}
+			next, buildErr := buildModelWithRetryLimit(fresh, provider, *providerRetries)
+			if buildErr != nil {
+				return "", buildErr
+			}
+			selectedModel = budget.Wrap(next, "agent")
+			session.SetModel(selectedModel)
+			if !strings.EqualFold(provider, "demo") {
+				manager.SetSummarizer(chatSummarizer(budget.Wrap(next, "summary")))
+			}
+			return displayModelName(fresh, provider), nil
+		}
 		// 尝试恢复上次会话。
 		offerResume(session, readOnlyTools.WorkspaceRoot())
 		// 提示未完成的轮次；交互内恢复留待后续，先用一次性 --resume 完成。
@@ -535,12 +544,13 @@ func runCLI(args []string) (runErr error) {
 		}
 		// 进入 REPL 循环。
 		return runInteractive(ctx, session, replConfig{
-			Provider:  *provider,
-			Model:     displayModelName(appConfig, *provider),
-			Mode:      *mode,
-			Workspace: readOnlyTools.WorkspaceRoot(),
-			Timeout:   *timeout,
-			Engine:    engine,
+			Provider:       *provider,
+			Model:          displayModelName(appConfig, *provider),
+			Mode:           *mode,
+			Workspace:      readOnlyTools.WorkspaceRoot(),
+			Timeout:        *timeout,
+			Engine:         engine,
+			SwitchProvider: switchProvider,
 		})
 	}
 
@@ -631,6 +641,19 @@ func compactLine(text string, maxRunes int) string {
 		return text
 	}
 	return string(runes[:maxRunes-1]) + "…"
+}
+
+// chatSummarizer 返回用指定模型压缩工作历史的摘要函数；启动装配与 /model 热切换共用。
+func chatSummarizer(summarizer harness.Model) func(context.Context, string) (string, error) {
+	return func(ctx context.Context, oldText string) (string, error) {
+		response, err := summarizer.Generate(ctx, []harness.Message{
+			{Role: "user", Content: "请把下面这段 Agent 工作历史总结成不超过 200 字的要点，保留目标、已改文件、验证结果、失败与下一步：\n" + oldText},
+		}, nil, harness.ModelEventSinkFunc(func(harness.ModelEvent) {}))
+		if err != nil {
+			return "", err
+		}
+		return response.Content, nil
+	}
 }
 
 // buildModel 根据 provider 名称创建模型实现，配置来自配置文件与环境变量取值链。

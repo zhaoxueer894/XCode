@@ -115,6 +115,8 @@ REPL 内置几个斜杠命令：
 
 ```text
 /status             当前 provider、轮数、累计 token、已改文件、测试状态
+/model              切换模型供应商：菜单选择（或 /model deepseek 直接指定），
+                     写入配置文件并立即生效，对话历史保留
 /compact            压缩对话历史，释放上下文（工作笔记保留）
 /trust go test      信任某个命令前缀，本会话内执行它不再弹审批
 /clear              清空会话历史（项目记忆保留）
