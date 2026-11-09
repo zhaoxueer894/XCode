@@ -254,3 +254,79 @@ func TestBudgetGuidanceFlagsUnverifiedProductionEdit(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestExplorationGateNarrowsToolsUntilFirstProductionEdit(t *testing.T) {
+	registry, err := harness.NewRegistry(
+		staticTool{name: "read_file", output: "content"},
+		staticTool{name: "search_text", output: "hits"},
+		staticTool{name: "list_files", output: "names"},
+		staticTool{name: "exec", output: "command=ok exit_code=0"},
+		staticTool{name: "apply_patch", output: "updated"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	has := func(tools []harness.ToolSpec, name string) bool {
+		for _, spec := range tools {
+			if spec.Name == name {
+				return true
+			}
+		}
+		return false
+	}
+	step := 0
+	model := modelFunc(func(_ context.Context, messages []harness.Message, tools []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+		step++
+		notice := messages[0].Content
+		switch step {
+		case 5:
+			if len(tools) != 5 {
+				t.Fatalf("early request should advertise all tools, got %d", len(tools))
+			}
+		case 7:
+			if has(tools, "search_text") || has(tools, "list_files") {
+				t.Fatalf("search tools should be gated at half budget: %v", tools)
+			}
+			if !has(tools, "exec") || !has(tools, "apply_patch") || !has(tools, "read_file") {
+				t.Fatalf("level-1 gate must keep read/edit/exec: %v", tools)
+			}
+			if !strings.Contains(notice, "EXPLORATION BUDGET OVER") {
+				t.Fatalf("missing gate directive: %s", notice)
+			}
+		case 10:
+			if has(tools, "exec") || has(tools, "search_text") {
+				t.Fatalf("exec should be gated at 70%% spent: %v", tools)
+			}
+			if !has(tools, "apply_patch") || !has(tools, "read_file") {
+				t.Fatalf("level-2 gate must keep read/edit: %v", tools)
+			}
+			if !strings.Contains(notice, "EXPLORATION CLOSED") {
+				t.Fatalf("missing closed directive: %s", notice)
+			}
+		case 11:
+			// 第 10 轮已做生产修改：门禁必须立即解除，exec 恢复供验证使用。
+			if len(tools) != 5 {
+				t.Fatalf("gate must lift after a production edit, got %d tools", len(tools))
+			}
+			if strings.Contains(notice, "EXPLORATION") {
+				t.Fatalf("gate directive should be gone: %s", notice)
+			}
+		case 12:
+			if len(tools) != 0 {
+				t.Fatalf("final request must have no tools, got %d", len(tools))
+			}
+			return harness.ModelResponse{Content: "done", Usage: harness.Usage{TotalTokens: 100}}, nil
+		}
+		if step == 10 {
+			call := harness.ToolCall{ID: "gate-edit", Name: "apply_patch", Arguments: json.RawMessage(`{"path":"source.go","operation":"update"}`)}
+			return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 100}}, nil
+		}
+		call := harness.ToolCall{ID: fmt.Sprintf("gate-read-%d", step), Name: "read_file", Arguments: json.RawMessage(fmt.Sprintf(`{"path":"file%d.go"}`, step))}
+		return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 100}}, nil
+	})
+	budget := harness.NewModelBudget(12, 1300, nil)
+	agent := harness.NewAgent(budget.Wrap(model, "agent"), registry, 16, nil)
+	if _, err := agent.Run(context.Background(), "implement the requested fix"); err != nil {
+		t.Fatal(err)
+	}
+}
