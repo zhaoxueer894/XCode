@@ -102,7 +102,9 @@ func TestWorkspaceRestoresLinkMetadataAndNeverReadsOutsideTarget(t *testing.T) {
 	}
 	for name, target := range links {
 		got, err := os.Readlink(filepath.Join(root, filepath.FromSlash(name)))
-		if err != nil || got != target {
+		// os.Root.Symlink 在部分 Windows 环境会把相对目标规范化为反斜杠分隔；
+		// 两种写法语义等价，按规范化形式比较。
+		if err != nil || filepath.ToSlash(got) != filepath.ToSlash(target) {
 			t.Fatalf("link %s = %s %v", name, got, err)
 		}
 	}
