@@ -29,10 +29,10 @@ deepseek-api-key=sk-...
 
 # ---- Compression classifier (optional; active only with --typed-shadow) ----
 # jev=on  : TypeSafe systemone service (needs the typesafe-* keys).
-# jev=off : a chat model. Defaults to the developer model; set BOTH
-#           typed-classifier-* keys to use a dedicated model instead
-#           (credential: bailian-api-key).
+# jev=off : a chat model. Defaults to the developer model; set the three
+#           typed-classifier-* keys to use a dedicated model instead.
 # jev=off
+# typed-classifier-api-key=sk-...
 # typed-classifier-endpoint=https://dashscope.aliyuncs.com/compatible-mode/v1
 # typed-classifier-model=qwen-plus
 # typesafe-api-key=...

@@ -51,6 +51,7 @@ type Config struct {
 
 	// 类型化 shadow 分类器的独立模型配置（与主模型解耦）。
 	TypedClassifierBackend  string // 保存分类后端：local（聊天模型）或 jev（TypeSafe systemone）；空值视为 local。
+	TypedClassifierAPIKey  string // typed-classifier-api-key: dedicated classifier credential.
 	TypedClassifierEndpoint string // 保存 local 分类器的 OpenAI 兼容端点；空值表示复用主模型。
 	TypedClassifierModel    string // 保存 local 分类器的模型名；空值表示复用主模型。
 }
@@ -181,6 +182,8 @@ func applyValue(cfg *Config, key, value string) {
 		cfg.Jev = value
 	case "typed-classifier":
 		cfg.TypedClassifierBackend = value
+	case "typed-classifier-api-key":
+		cfg.TypedClassifierAPIKey = value
 	case "typed-classifier-endpoint":
 		cfg.TypedClassifierEndpoint = value
 	case "typed-classifier-model":

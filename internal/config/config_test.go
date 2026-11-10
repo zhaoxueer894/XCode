@@ -38,6 +38,27 @@ func TestLoadParsesProviderCredentialKeys(t *testing.T) {
 }
 
 // TestLoadWithoutProviderLeavesFlagUnset 验证未配置 provider 时 ProviderSet 为 false。
+// TestLoadParsesClassifierDedicatedKey: the dedicated classifier credential
+// key must actually parse (it was once documented but never wired).
+func TestLoadParsesClassifierDedicatedKey(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("HOME", home)
+	_ = os.MkdirAll(filepath.Join(home, ".xcode"), 0o700)
+	_ = os.WriteFile(filepath.Join(home, ".xcode", "config"), []byte(
+		"typed-classifier-api-key=sk-classifier\n"+
+			"typed-classifier-endpoint=https://x.example\n"+
+			"typed-classifier-model=m\n"), 0o600)
+
+	merged, err := Load(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if merged.TypedClassifierAPIKey != "sk-classifier" {
+		t.Fatalf("typed-classifier-api-key = %q, want sk-classifier", merged.TypedClassifierAPIKey)
+	}
+}
+
 func TestLoadWithoutProviderLeavesFlagUnset(t *testing.T) {
 	t.Setenv("USERPROFILE", t.TempDir())
 	t.Setenv("HOME", t.TempDir())

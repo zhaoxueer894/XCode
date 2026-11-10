@@ -143,9 +143,10 @@ func typesafeSettings(cfg config.Config) (key, endpoint, model string) {
 		pick(cfg.TypesafeModel, os.Getenv("TYPESAFE_MODEL"))
 }
 
-// classifierKey 解析 local 分类后端 Key：bailian 配置键优先，环境变量兜底。
+// classifierKey resolves the dedicated-classifier credential: its own key
+// first, then the bailian key (legacy default), then env.
 func classifierKey(cfg config.Config) string {
-	return pick(cfg.BailianAPIKey, os.Getenv("DASHSCOPE_API_KEY"))
+	return pick(cfg.TypedClassifierAPIKey, cfg.BailianAPIKey, os.Getenv("DASHSCOPE_API_KEY"))
 }
 
 // displayModelName 返回某供应商当前生效的模型名，供 REPL 状态栏展示。
