@@ -12,17 +12,16 @@
 go build -o bin/xcode.exe ./cmd/xcode
 ```
 
-使用外部 DeepSeek 文本配置，不把密钥复制进仓库：
+凭据通过环境变量传入（`--model-config`/`--model-key-index` 已随单文件配置改造移除；密钥仍不进仓库）：
 
 ```powershell
-bin/xcode.exe --isolated --non-interactive --model-config C:/private/deepseek.txt --workspace D:/path/to/task --policy evals/policies/go-tests.json --no-delegate --provider-retries 0 --max-model-calls 100 --max-tokens 200000 --max-steps 100 --timeout 20m --event-log .eval/my-run/events.jsonl --artifact-dir .eval/my-run/artifacts --result-file .eval/my-run/result.json --prompt-file D:/path/to/instruction.txt
+$env:DEEPSEEK_API_KEY = "sk-..."   # 或从仓库外的私人文件读取后设置
+bin/xcode.exe --isolated --non-interactive --provider deepseek --workspace D:/path/to/task --policy evals/policies/go-tests.json --no-delegate --provider-retries 0 --max-model-calls 100 --max-tokens 200000 --max-steps 100 --timeout 20m --event-log .eval/my-run/events.jsonl --artifact-dir .eval/my-run/artifacts --result-file .eval/my-run/result.json --prompt-file D:/path/to/instruction.txt
 ```
 
 每次使用新的输出目录，已有结果文件不会被覆盖。命令执行仍经过策略；不在批准规则里的命令需要审批，而无人值守模式会直接拒绝审批，不会等待键盘输入。上述 Go 规则允许执行项目测试，测试本身会执行代码；只对可信任务或隔离环境使用。
 
-配置文本只提取模型、标准 API 地址和 API key。描述文字不会被执行。允许 `model: deepseek-flash` 和 `api-key:` 后的 key；多把不同 key 默认取第一把，`--model-key-index 1` 选择第二把。不会自动换模型或换 key。配置文件不进入结果，结果中只有模型、端点和 key 序号。
-
-不传文件时，`--provider deepseek` 使用 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`。默认模型 `deepseek-flash`；明确记录 `thinking=enabled`、`reasoning_effort=high`，每次最多输出 8192 token。可用对应 flag 修改。
+`--provider deepseek` 读取 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`。默认模型 `deepseek-flash`；明确记录 `thinking=enabled`、`reasoning_effort=high`，每次最多输出 8192 token。可用对应 flag 修改。Harbor 批量入口（run_pilot.py）在宿主侧解析仓库外的凭据文本并只以环境变量传入容器，命令行文本与上传文件不含密钥。
 
 连续工具调用会保留并回传协议需要的 `reasoning_content`，参见 [DeepSeek 思考模式文档](https://api-docs.deepseek.com/guides/thinking_mode/)。
 
