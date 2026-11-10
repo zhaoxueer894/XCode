@@ -23,8 +23,38 @@ type Delegate struct {
 	factory       SubagentFactory // 创建子智能体的工厂函数。
 	workspaceRoot string          // 工作区根路径，用于加载角色技能。
 	eventSink     EventSink       // 父的事件接收端，由接线方注入。
-	mu            sync.Mutex      // 保护子智能体编号自增。
+	mu            sync.Mutex      // 保护子智能体编号自增与流水线工位状态。
 	nextID        int             // 下一个子智能体编号。
+	// 流水线模式（编排者只做分发）：强制 planner → developer 顺序，并记录
+	// 各工位是否完成，供完成门禁做前置条件拦截。
+	pipeline      bool
+	plannerDone   bool
+	developerDone bool
+}
+
+// EnablePipeline 打开流水线模式：role 必填，developer 必须在 planner 完成后才能派出。
+func (d *Delegate) EnablePipeline() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.pipeline = true
+}
+
+// MissingStages 返回流水线尚未完成的工位；非流水线模式恒为空。
+// 完成门禁据此拦截"编排者声称完成但 developer 从未运行"的情况。
+func (d *Delegate) MissingStages() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if !d.pipeline {
+		return nil
+	}
+	var missing []string
+	if !d.plannerDone {
+		missing = append(missing, "planner stage has not completed (delegate role=planner first)")
+	}
+	if !d.developerDone {
+		missing = append(missing, "developer stage has not completed (delegate role=developer with the planner's report)")
+	}
+	return missing
 }
 
 // NewDelegate 创建 delegate 工具；factory 由接线方提供（通常是 NewAgent + Run 的闭包）。
@@ -80,6 +110,19 @@ func (d *Delegate) Execute(ctx context.Context, raw json.RawMessage) (ToolResult
 	if args.MaxSteps < 1 || args.MaxSteps > 16 {
 		return ToolResult{}, fmt.Errorf("max_steps must be between 1 and 16")
 	}
+	// 流水线顺序硬校验：developer 之前必须已有 planner 的诊断报告。
+	role := strings.ToLower(strings.TrimSpace(args.Role))
+	d.mu.Lock()
+	pipeline, plannerDone := d.pipeline, d.plannerDone
+	d.mu.Unlock()
+	if pipeline {
+		if role == "" {
+			return ToolResult{}, fmt.Errorf("pipeline mode requires a role: planner, developer or reviewer")
+		}
+		if role == "developer" && !plannerDone {
+			return ToolResult{}, fmt.Errorf("pipeline order: delegate role=planner first; the developer needs the planner's structured diagnosis report")
+		}
+	}
 
 	// 加载角色技能正文作为前导指令（可选）。
 	roleInstructions := ""
@@ -119,6 +162,15 @@ func (d *Delegate) Execute(ctx context.Context, raw json.RawMessage) (ToolResult
 		return ToolResult{}, fmt.Errorf("subagent %s: %w", agentID, err)
 	}
 	d.emitComplete(agentID, args.Role, truncateRunes(result, 200))
+	// 工位完成记账：只有成功返回才算完成，失败的工位允许重派。
+	d.mu.Lock()
+	switch role {
+	case "planner":
+		d.plannerDone = true
+	case "developer":
+		d.developerDone = true
+	}
+	d.mu.Unlock()
 
 	observation := fmt.Sprintf("[subagent %s (%s) completed]\n%s", agentID, args.Role, result)
 	return ToolResult{

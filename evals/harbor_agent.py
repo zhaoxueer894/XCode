@@ -27,6 +27,7 @@ class XCodeAgent(BaseInstalledAgent):
         self, *args, binary_path: str = "bin/xcode-linux-amd64",
         workspace: str = "/app", provider: str = "deepseek", credentials_file: str | None = None,
         no_delegate: bool | str = False, max_model_calls: int = 100,
+        orchestrate: str = "", reviewer_provider: str = "", reviewer_model: str = "",
         max_tokens: int = 0, max_steps: int = 100, timeout_sec: int = 1200,
         context_strategy: str = "bounded", context_budget: int = 6000, **kwargs,
     ):
@@ -44,6 +45,7 @@ class XCodeAgent(BaseInstalledAgent):
         self.workspace, self.provider = workspace, provider
         self.credentials_file = Path(credentials_file) if credentials_file else None
         self.no_delegate = as_bool(no_delegate)
+        self.orchestrate, self.reviewer_provider, self.reviewer_model = orchestrate, reviewer_provider, reviewer_model
         self.max_model_calls, self.max_tokens = int(max_model_calls), int(max_tokens)
         self.max_steps, self.timeout_sec = int(max_steps), int(timeout_sec)
         self.context_strategy, self.context_budget = context_strategy, int(context_budget)
@@ -103,6 +105,11 @@ class XCodeAgent(BaseInstalledAgent):
                     f"{prefix}_BASE_URL", "https://api.deepseek.com" if self.provider == "deepseek" else "https://dashscope.aliyuncs.com/compatible-mode/v1"
                 ),
             }
+        # 跨模型审查：GLM 凭据仅以环境变量进入容器，命令行文本与上传文件不含密钥。
+        for name in ("GLM_API_KEY", "GLM_MODEL", "GLM_BASE_URL"):
+            value = self._extra_env.get(name) or os.environ.get(name)
+            if value:
+                env[name] = value
         logs = str(self.environment_logs_dir)
         prepared = await environment.exec(command=f"mkdir -p {shlex.quote(logs)}; git rev-parse HEAD", cwd=self.workspace)
         if prepared.return_code:
@@ -128,6 +135,12 @@ class XCodeAgent(BaseInstalledAgent):
         ]
         if self.no_delegate:
             args.append("--no-delegate")
+        if self.orchestrate:
+            args += ["--orchestrate", str(self.orchestrate)]
+        if self.reviewer_provider:
+            args += ["--reviewer-provider", str(self.reviewer_provider)]
+        if self.reviewer_model:
+            args += ["--reviewer-model", str(self.reviewer_model)]
         capture = ["python3", "/installed-agent/capture_patch.py", "--workspace", self.workspace,
                    "--base-commit", base, "--output", f"{logs}/model.patch"]
         # CLI budget/timeout failures still produce a patch and proceed to grading.

@@ -41,6 +41,12 @@ type Config struct {
 	TypesafeAPIKey   string // typesafe-api-key：jev 分类后端（TypeSafe systemone）密钥。
 	TypesafeEndpoint string // typesafe-endpoint：jev 分类服务端点。
 	TypesafeModel    string // typesafe-model：jev 分类模型名。
+	GlmAPIKey        string // glm-api-key：智谱 GLM 密钥（常作跨模型 reviewer）。
+	GlmBaseURL       string // glm-base-url：GLM OpenAI 兼容端点（默认 https://open.bigmodel.cn/api/paas/v4）。
+	GlmModel         string // glm-model：GLM 模型名（默认 glm-4.6）。
+	ReviewerProvider string // reviewer-provider：完成门禁审查模型供应商；空 = 未配置（降级为同模型并警告）。
+	ReviewerModel    string // reviewer-model：审查模型名；覆盖该供应商默认模型。
+	Orchestrate      string // orchestrate：编排模式 single / single-review / pipeline；空 = 全工具智能体。
 
 	// 类型化 shadow 分类器的独立模型配置（与主模型解耦）。
 	TypedClassifierBackend  string // 保存分类后端：local（聊天模型）或 jev（TypeSafe systemone）；空值视为 local。
@@ -158,6 +164,18 @@ func applyValue(cfg *Config, key, value string) {
 		cfg.TypesafeEndpoint = value
 	case "typesafe-model", "typesafe_model":
 		cfg.TypesafeModel = value
+	case "glm-api-key", "glm_api_key":
+		cfg.GlmAPIKey = value
+	case "glm-base-url", "glm_base_url":
+		cfg.GlmBaseURL = value
+	case "glm-model", "glm_model":
+		cfg.GlmModel = value
+	case "reviewer-provider", "reviewer_provider":
+		cfg.ReviewerProvider = value
+	case "reviewer-model", "reviewer_model":
+		cfg.ReviewerModel = value
+	case "orchestrate":
+		cfg.Orchestrate = value
 	case "typed-classifier":
 		cfg.TypedClassifierBackend = value
 	case "typed-classifier-endpoint":

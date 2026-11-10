@@ -3,6 +3,7 @@ package harness
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -15,6 +16,7 @@ type ModelBudget struct {
 	maxCalls, maxTokens int
 	calls, missingUsage int
 	usage               Usage
+	usageByPurpose      map[string]Usage // 按 Wrap 的 purpose 分账；流水线工位预算上限据此判定。
 	sink                EventSink
 }
 
@@ -25,7 +27,7 @@ type ModelBudgetSnapshot struct {
 }
 
 func NewModelBudget(maxCalls, maxTokens int, sink EventSink) *ModelBudget {
-	return &ModelBudget{maxCalls: maxCalls, maxTokens: maxTokens, sink: sink}
+	return &ModelBudget{maxCalls: maxCalls, maxTokens: maxTokens, sink: sink, usageByPurpose: map[string]Usage{}}
 }
 
 func (b *ModelBudget) Snapshot() ModelBudgetSnapshot {
@@ -60,9 +62,22 @@ func (m *budgetModel) Generate(ctx context.Context, messages []Message, tools []
 	spent, missing := b.usage.TotalTokens, b.missingUsage
 	b.mu.Unlock()
 	id := fmt.Sprintf("model-%06d", call)
+	// 流水线 planner 工位上限：诊断阶段最多消耗全 run token 预算的 30%。
+	// 到上限不硬杀（那样 planner 永远"未完成"，developer 会被顺序校验卡死），
+	// 而是按最后请求处理：禁用工具，强制产出结构化诊断报告。
+	stageCapped := false
+	if strings.HasPrefix(m.purpose, "sub:planner") && b.maxTokens > 0 {
+		b.mu.Lock()
+		stageCapped = b.usageByPurpose[m.purpose].TotalTokens*10 >= b.maxTokens*3
+		b.mu.Unlock()
+	}
 	finalRequest, gate := false, 0
 	if m.purpose != "summary" {
 		notice, final, g := b.guidance(ctx, call, spent, missing)
+		if stageCapped {
+			final = true
+			notice += "\nPLANNER STAGE BUDGET EXHAUSTED: the diagnosis stage has used its 30% share of the run budget. Tools are disabled. Write the structured diagnosis report now: files, root cause, reproduction command, functions to change."
+		}
 		finalRequest, gate = final, g
 		input := make([]Message, 0, len(messages)+1)
 		input = append(input, Message{Role: "system", Content: notice})
@@ -106,6 +121,11 @@ func (m *budgetModel) Generate(ctx context.Context, messages []Message, tools []
 	b.usage.InputTokens += usage.InputTokens
 	b.usage.OutputTokens += usage.OutputTokens
 	b.usage.TotalTokens += usage.TotalTokens
+	staged := b.usageByPurpose[m.purpose]
+	staged.InputTokens += usage.InputTokens
+	staged.OutputTokens += usage.OutputTokens
+	staged.TotalTokens += usage.TotalTokens
+	b.usageByPurpose[m.purpose] = staged
 	if !known {
 		b.missingUsage++
 	}
@@ -195,7 +215,7 @@ func (b *ModelBudget) guidance(ctx context.Context, call, spent, missing int) (s
 	}
 	// 探索门禁只在能读到该智能体的进度快照且尚无生产修改时触发；
 	// 直接调用模型（无快照）不受影响，交互式无限预算也不受影响。
-	progress, hasProgress := ctx.Value(runtimeProgressKey{}).(runtimeProgress)
+	progress, hasProgress := ctx.Value(runtimeProgressKey{}).(*runtimeProgress)
 	gate := 0
 	if hasProgress && progress.ProductionEdits == 0 {
 		switch {

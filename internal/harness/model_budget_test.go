@@ -380,3 +380,45 @@ func TestGatePrunesWithheldToolCallsFromResponse(t *testing.T) {
 		t.Fatalf("expected 7 read_file executions, got %v", executed)
 	}
 }
+
+// TestSubagentSharesRunProgressLedger 验证 run 级共享账本：父智能体改过生产代码后，
+// 晚出生的子智能体在自己的首个请求里就看到这次修改，不会被当成零编辑而触发门禁。
+func TestSubagentSharesRunProgressLedger(t *testing.T) {
+	budget := harness.NewModelBudget(20, 2000, nil)
+	var subNotice string
+	var registry *harness.Registry
+	delegate := harness.NewDelegate(func(ctx context.Context, role, prompt string, maxSteps int, sink harness.EventSink) (string, error) {
+		subModel := modelFunc(func(_ context.Context, messages []harness.Message, _ []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+			subNotice = messages[0].Content
+			return harness.ModelResponse{Content: "sub done", Usage: harness.Usage{TotalTokens: 10}}, nil
+		})
+		sub := harness.NewAgent(budget.Wrap(subModel, "sub:"+role), registry, maxSteps, sink)
+		return sub.Run(ctx, prompt)
+	}, t.TempDir())
+	var err error
+	registry, err = harness.NewRegistry(staticTool{name: "apply_patch", output: "updated"}, delegate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := 0
+	parent := modelFunc(func(_ context.Context, _ []harness.Message, _ []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+		step++
+		switch step {
+		case 1:
+			call := harness.ToolCall{ID: "edit", Name: "apply_patch", Arguments: json.RawMessage(`{"path":"source.go","operation":"update"}`)}
+			return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 10}}, nil
+		case 2:
+			call := harness.ToolCall{ID: "spawn", Name: "delegate", Arguments: json.RawMessage(`{"prompt":"continue the work"}`)}
+			return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 10}}, nil
+		}
+		return harness.ModelResponse{Content: "done", Usage: harness.Usage{TotalTokens: 10}}, nil
+	})
+	ctx := harness.WithRunProgress(context.Background())
+	agent := harness.NewAgent(budget.Wrap(parent, "agent"), registry, 12, nil)
+	if _, err := agent.Run(ctx, "implement the requested fix"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(subNotice, "1 production edits") {
+		t.Fatalf("subagent did not see the shared ledger: %s", subNotice)
+	}
+}

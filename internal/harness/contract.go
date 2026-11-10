@@ -61,6 +61,16 @@ func (a *Agent) runCompletionGate(ctx context.Context, step int, options RunOpti
 	contract := options.Contract
 	result := gateResult{}
 
+	// 第零步：流水线前置条件——编排者声称完成但工位未走完时直接拦截。
+	// 这是硬约束：文本指令教不会编排者按序派活，顺序错误在这里被物理拒绝。
+	if options.PipelinePrecondition != nil {
+		if missing := options.PipelinePrecondition(); len(missing) > 0 {
+			result.Reasons = append(result.Reasons, missing...)
+			result.UserMessage = gateUserMessage(contract, result.Reasons)
+			return result
+		}
+	}
+
 	// 第一步：取当前工作区指纹；指纹函数缺失时证据不与版本绑定（每次都重新执行验证）。
 	fingerprint := ""
 	if options.WorkspaceFingerprint != nil {

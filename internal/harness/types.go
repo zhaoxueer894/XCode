@@ -151,6 +151,7 @@ const (
 const (
 	CompletionGateBlocked EventKind = "completion.gate.blocked" // 门禁拒绝完成声明；data 保存阻塞原因。
 	CompletionGatePassed  EventKind = "completion.gate.passed"  // 门禁放行；data 保存当时的工作区指纹。
+	ReviewDegraded        EventKind = "review.degraded"         // 跨模型审查失败后降级为开发者同模型；绝不静默。
 )
 
 // 多智能体生命周期事件。

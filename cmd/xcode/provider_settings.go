@@ -5,17 +5,22 @@ package main
 // 环境变量仅作为 CI 等无配置文件场景的注入兜底。
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
 	"xcode/internal/config"
+	"xcode/internal/harness"
 	"xcode/internal/model/bailian"
 	"xcode/internal/model/deepseek"
+	"xcode/internal/model/glm"
 )
 
 const (
 	defaultDeepseekBaseURL = "https://api.deepseek.com"
 	defaultDeepseekModel   = "deepseek-flash"
+	defaultGlmBaseURL      = "https://open.bigmodel.cn/api/paas/v4"
+	defaultGlmModel        = "glm-4.6"
 )
 
 // pick 返回第一个非空（去空白后）候选值，调用方按优先级顺序传入。
@@ -57,6 +62,43 @@ func deepseekSettings(cfg config.Config, thinking, effort string, retries, outpu
 	return settings
 }
 
+// glmSettings 构建 glm 客户端配置；modelOverride 非空时覆盖模型名（reviewer-model）。
+func glmSettings(cfg config.Config, modelOverride string, retries int) glm.Config {
+	return glm.Config{
+		APIKey:         pick(cfg.GlmAPIKey, os.Getenv("GLM_API_KEY")),
+		BaseURL:        pick(cfg.GlmBaseURL, os.Getenv("GLM_BASE_URL"), defaultGlmBaseURL),
+		Model:          pick(modelOverride, cfg.GlmModel, os.Getenv("GLM_MODEL"), defaultGlmModel),
+		MaxRetries:     retries,
+		DisableRetries: retries == 0,
+	}
+}
+
+// buildReviewerModel 构建跨模型审查模型；modelOverride 非空时覆盖该供应商默认模型。
+// 返回的模型未包预算（由调用方按 sub:reviewer 用途包装）；第二个返回值为生效模型名。
+func buildReviewerModel(cfg config.Config, provider, modelOverride string, retries int) (harness.Model, string, error) {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "glm":
+		settings := glmSettings(cfg, modelOverride, retries)
+		client, err := glm.New(settings)
+		return client, settings.Model, err
+	case "deepseek":
+		settings := deepseekSettings(cfg, "enabled", "high", retries, 0)
+		if strings.TrimSpace(modelOverride) != "" {
+			settings.Model = strings.TrimSpace(modelOverride)
+		}
+		client, err := deepseek.New(settings)
+		return client, settings.Model, err
+	case "bailian":
+		settings := bailianSettings(cfg, retries)
+		if strings.TrimSpace(modelOverride) != "" {
+			settings.Model = strings.TrimSpace(modelOverride)
+		}
+		client, err := bailian.New(settings)
+		return client, settings.Model, err
+	}
+	return nil, "", fmt.Errorf("reviewer-provider must be glm, deepseek or bailian")
+}
+
 // providerKeyConfigured 判断某供应商的 API Key 在配置文件或环境变量中是否可用。
 func providerKeyConfigured(cfg config.Config, provider string) bool {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
@@ -64,6 +106,8 @@ func providerKeyConfigured(cfg config.Config, provider string) bool {
 		return pick(cfg.BailianAPIKey, os.Getenv("DASHSCOPE_API_KEY")) != ""
 	case "deepseek":
 		return pick(cfg.DeepseekAPIKey, os.Getenv("DEEPSEEK_API_KEY")) != ""
+	case "glm":
+		return pick(cfg.GlmAPIKey, os.Getenv("GLM_API_KEY")) != ""
 	}
 	return false
 }
@@ -85,6 +129,8 @@ func providerKeyHint(provider string) string {
 		return "bailian-api-key=sk-..."
 	case "deepseek":
 		return "deepseek-api-key=sk-..."
+	case "glm":
+		return "glm-api-key=..."
 	}
 	return ""
 }

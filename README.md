@@ -198,8 +198,11 @@ xcode eval-fault                 故障注入评测：对比不同压缩/恢复�
 运行参数优先级：命令行 flag > 项目级 `.xcode/config` > 全局 `~/.xcode/config` > 内置默认值。常用的几项：
 
 ```text
-provider=bailian          # demo / bailian / deepseek
+provider=bailian          # demo / bailian / deepseek / glm
 bailian-api-key=sk-...    # 供应商凭据三键见"配置模型"一节；base-url/model 有默认值
+orchestrate=              # 空(全工具智能体) / single / single-review / pipeline
+reviewer-provider=        # 完成门禁跨模型审查供应商（如 glm）；空=降级同模型并警告
+reviewer-model=           # 审查模型名；不填用该供应商默认模型
 mode=workspace-write      # plan / workspace-write / full-access
 context-strategy=bounded  # bounded / none / sliding / handoff / compaction / decision-gated
 context-budget=6000      # 模型可见历史的估算 token 目标；不含工具说明
@@ -213,6 +216,24 @@ timeout=2m
 默认 `bounded` 保留任务、项目要求和最近的完整工具往返，将较早结果收敛为带 artifact 引用的证据记录。完整历史仍保存，当前任务或最新一次工具往返过大时可以超过目标，工具调用和结果不会被拆开。`none` 可显式关闭压缩。每次模型调用还会收到最新的共享请求/token 余额及剩余时间；这些提示不重复写入会话历史。观察到生产修改且其后的命令成功退出时，提示会要求立即收尾；修改后连续多次调用没有任何成功验证时，提示会要求先做一次聚焦验证再结束。预算只够最后一次请求时（剩余请求为 1 或剩余 token 不足 5%），该请求直接禁用工具，让模型产出最终回答，而不是发起一个结果永远无人消费的工具调用。预算过半仍没有观察到生产修改时进入探索门禁：先禁用搜索与列目录，剩余不足三成再禁用命令执行，只留读文件、改文件和 diff，强制转入实现；一旦观察到生产修改，门禁立即解除。委派模式下每个智能体按各自进度受同一规则约束。
 
 命令执行前的快照支持符号链接：保存、恢复链接本身，不读取链接目标。构建工具所需的 Go 缓存、并发设置及已激活的 Python 环境会传给命令，模型 API 密钥不传给命令子进程。
+
+## 编排模式与跨模型审查
+
+`orchestrate` 决定协作拓扑，`--orchestrate` flag 优先于配置文件：
+
+- **single**：单智能体，模型看不到 delegate 工具；
+- **single-review**：单智能体 + 完成门禁强制审查（自动启用 review 契约）；
+- **pipeline**：流水线编排者——工具箱只保留 delegate 与 git_diff，禁止亲自改代码；
+  强制 planner（结构化诊断，预算上限为全 run 的 30%）→ developer（唯一编辑者）→
+  完成门禁。工位顺序由代码校验：developer 先于 planner 会被拒绝；编排者提前声称
+  完成会被门禁前置条件打回。
+
+完成门禁的 reviewer 是唯一必经的独立智能体：全新上下文、只看目标 + diff + 测试结果，
+不看开发过程。`reviewer-provider` 配置跨模型审查（如 glm）；未配置或运行期失败
+（token 耗尽、服务商异常）时**自动降级为开发者同模型并三重警告**（stderr 横幅 +
+`review.degraded` 事件 + 运行记录标记），绝不静默。探索门禁与运行时提示按 run 级
+共享账本判定——主智能体与全部子智能体共用同一本"是否有人改过生产代码"的账，
+晚期出生的子智能体不会因空白账本被误伤。
 
 ## 测试
 

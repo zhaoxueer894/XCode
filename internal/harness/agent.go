@@ -111,7 +111,9 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 	}
 	a.emit(Event{Kind: RunStarted, Data: lastInput})
 	var totalUsage Usage
-	progress := runtimeProgress{}
+	// run 级共享进度账本：CLI 经 WithRunProgress 注入时，主智能体与全部子智能体
+	// 读写同一本账；未注入时退回私有账本（单智能体等价）。
+	progress := runtimeProgressFromContext(ctx)
 	// 轮次开始边界——记录本轮用户输入，崩溃后恢复器从这段记录重建消息历史。
 	a.turnLog.AppendStarted(lastInput, len(options.ResumePending) > 0)
 
@@ -119,7 +121,7 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 	// 让重建的消息历史重新满足“每个 tool_call 都有对应 tool 消息”的模型协议要求。
 	// 补执行与正常循环共用 runToolCall 路径，事件与恢复日志完全一致；step 0 表示恢复补执行。
 	for _, call := range options.ResumePending {
-		if a.runToolCall(ctx, 0, call, &messages, doom, &progress) {
+		if a.runToolCall(ctx, 0, call, &messages, doom, progress) {
 			err := fmt.Errorf("%w: %s repeated %d times in a row", ErrDoomLoop, call.Name, doom.streak)
 			a.fail(0, StopDoomLoop, err)
 			return RunResult{StopReason: StopDoomLoop, Steps: 0, Usage: totalUsage, Messages: messages}, err
@@ -162,7 +164,7 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 			a.emitModelEvent(step, event)
 		})
 		modelContext := context.WithValue(ctx, runtimeProgressKey{}, progress)
-		response, err := a.model.Generate(modelContext, modelInput, a.runner.Specs(), modelSink)
+		response, err := a.model.Generate(modelContext, modelInput, advertisedTools(a.runner.Specs(), options.Orchestrate), modelSink)
 		if err != nil {
 			reason := StopFailed
 			if errors.Is(err, ErrBudget) {
@@ -221,7 +223,7 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 		}
 		for _, call := range response.ToolCalls {
 			// 单调用执行路径抽为 runToolCall，恢复预处理与正常循环共用同一实现。
-			if a.runToolCall(ctx, step, call, &messages, doom, &progress) {
+			if a.runToolCall(ctx, step, call, &messages, doom, progress) {
 				err := fmt.Errorf("%w: %s repeated %d times in a row", ErrDoomLoop, call.Name, doom.streak)
 				a.fail(step, StopDoomLoop, err)
 				return RunResult{StopReason: StopDoomLoop, Steps: step, Usage: totalUsage, Messages: messages}, err

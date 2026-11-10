@@ -117,6 +117,8 @@ def run_job(name: str, task_path: Path, agent: str, kwargs: dict, concurrent: in
     args=[str(Path(sys.executable).parent/"harbor"),"run","-p",str(task_path),"-a",agent,"-n",str(concurrent),
           "--max-retries","0","-o",str(OUTPUT/"harbor"),"--job-name",name]
     for key,value in kwargs.items():
+        if value == "" or value is None:
+            continue
         args += ["--ak",f"{key}={str(value).lower() if isinstance(value,bool) else value}"]
     log=OUTPUT/(name+".console.log")
     print("starting "+name,flush=True)
@@ -163,7 +165,9 @@ def main() -> None:
             "workspace":"auto","conda_env":"auto","no_delegate":bool(budget.get("no_delegate", True)),
             "context_strategy":budget.get("context_strategy","none"),"context_budget":budget.get("context_budget",12000),
             "max_model_calls":budget["max_model_calls"],"max_tokens":budget["max_tokens"],
-            "max_steps":budget["max_steps"],"timeout_sec":budget["timeout_sec"]},args.concurrency)
+            "max_steps":budget["max_steps"],"timeout_sec":budget["timeout_sec"],
+            "orchestrate":budget.get("orchestrate",""),"reviewer_provider":budget.get("reviewer_provider",""),
+            "reviewer_model":budget.get("reviewer_model","")},args.concurrency)
     report(args.gold_job,args.empty_job,args.agent_job)
 
 

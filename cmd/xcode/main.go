@@ -165,6 +165,9 @@ func runCLI(args []string) (runErr error) {
 	thinking := flags.String("thinking", "enabled", "DeepSeek thinking mode: enabled or disabled")
 	reasoningEffort := flags.String("reasoning-effort", "high", "DeepSeek reasoning effort: low, high or max")
 	maxOutputTokens := flags.Int("max-output-tokens", 0, "DeepSeek per-request output limit (0 = 8192)")
+	orchestrate := flags.String("orchestrate", appConfig.Orchestrate, "orchestration mode: single, single-review or pipeline (default: full-tool agent with delegate available)")
+	reviewerProvider := flags.String("reviewer-provider", appConfig.ReviewerProvider, "cross-model reviewer provider for the completion gate (glm/deepseek/bailian); empty degrades to the developer model with a warning")
+	reviewerModel := flags.String("reviewer-model", appConfig.ReviewerModel, "model id for the gate reviewer; overrides the provider default")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -273,6 +276,9 @@ func runCLI(args []string) (runErr error) {
 	defer stop()
 	ctx, cancel := context.WithTimeout(signalContext, *timeout)
 	defer cancel()
+	// run 级共享进度账本：主智能体与全部子智能体共用同一本账，探索门禁据此判定
+	// "这个 run 是否有人改过生产代码"，而不是"某个智能体自己改没改"。
+	ctx = harness.WithRunProgress(ctx)
 
 	// 完整工具结果保存在本地 Artifact Store，模型消息只接收受限预览。
 	artifacts, err := artifactstore.NewFileStore(*artifactDir)
@@ -294,6 +300,20 @@ func runCLI(args []string) (runErr error) {
 	}
 	if err != nil {
 		return err
+	}
+	// baseModel 是未包预算的原始模型：delegate 工厂按子智能体角色重新包装
+	// （purpose=sub:<role>），预算分账与 planner 工位上限据此区分。
+	baseModel := selectedModel
+	// 跨模型审查模型：reviewer-provider 未配置时保持 nil（门禁审查降级为
+	// 开发者同模型并三重警告，绝不静默）。
+	var reviewerBase harness.Model
+	if rp := strings.TrimSpace(*reviewerProvider); rp != "" {
+		reviewerBase, record.Reviewer.Model, err = buildReviewerModel(appConfig, rp, *reviewerModel, *providerRetries)
+		if err != nil {
+			return err
+		}
+		record.Reviewer.Configured = true
+		record.Reviewer.Provider = strings.ToLower(strings.TrimSpace(rp))
 	}
 	// 完整事件按 JSONL 落盘供事后排查；终端默认只渲染每步的极简进度行。
 	logPath := strings.TrimSpace(*eventLog)
@@ -364,8 +384,29 @@ func runCLI(args []string) (runErr error) {
 			if err != nil {
 				return "", err
 			}
-			subAgent := harness.NewAgent(selectedModel, subExecutor, maxSteps, subSink)
-			return subAgent.Run(ctx, prompt)
+			runSub := func(model harness.Model) (string, error) {
+				return harness.NewAgent(model, subExecutor, maxSteps, subSink).Run(ctx, prompt)
+			}
+			// 跨模型审查：reviewer 工位优先用独立审查模型；运行期失败（非预算
+			// 耗尽、非取消）时把"这一次审查"降级为开发者同模型执行——
+			// stderr 横幅 + review.degraded 事件 + 运行记录打标，三重警告不静默；
+			// 下一道门禁仍会先重试原配置的审查模型。
+			if strings.EqualFold(role, "reviewer") && reviewerBase != nil {
+				result, runErr := runSub(budget.Wrap(reviewerBase, "sub:reviewer"))
+				if runErr == nil {
+					return result, nil
+				}
+				if errors.Is(runErr, harness.ErrBudget) || ctx.Err() != nil {
+					return result, runErr
+				}
+				record.Reviewer.Degraded = true
+				record.Reviewer.Reason = runErr.Error()
+				subSink.Emit(harness.Event{Kind: harness.ReviewDegraded,
+					Data: "reviewer model failed (" + runErr.Error() + "); this review degrades to the developer model"})
+				fmt.Fprintf(os.Stderr, "[xcode] WARNING: cross-model reviewer failed (%v); degrading THIS review to the developer model\n", runErr)
+				return runSub(budget.Wrap(baseModel, "sub:reviewer-degraded"))
+			}
+			return runSub(budget.Wrap(baseModel, "sub:"+role))
 		},
 		readOnlyTools.WorkspaceRoot(),
 	)
@@ -573,6 +614,40 @@ func runCLI(args []string) (runErr error) {
 		fmt.Fprintf(os.Stderr, "[xcode] completion gate enabled: %d verify command(s), review=%t\n",
 			len(contract.VerifyCommands), contract.Review)
 	}
+	// 编排模式：single / single-review / pipeline。模式决定向模型声明的工具集
+	// （agent 层过滤），流水线额外启用工位顺序硬校验与门禁前置条件。
+	orchestrateMode := strings.ToLower(strings.TrimSpace(*orchestrate))
+	switch orchestrateMode {
+	case "", "single":
+	case "single-review", "pipeline":
+		if *noDelegate {
+			return fmt.Errorf("--orchestrate %s needs the delegate machinery for gate reviews; remove --no-delegate", orchestrateMode)
+		}
+		// 审查是这两种模式的定义性组成部分：没有显式契约时自动补一份
+		// 只含 review 的契约，保证完成门禁必经。
+		if options.Contract == nil {
+			options.Contract = &harness.TaskContract{Goal: prompt, Review: true}
+			options.WorkspaceFingerprint = wireWorkspaceFingerprint(readOnlyTools.WorkspaceRoot())
+			fmt.Fprintf(os.Stderr, "[xcode] orchestrate=%s: completion gate with review enabled automatically\n", orchestrateMode)
+		}
+		options.Contract.Review = true
+	default:
+		return fmt.Errorf("orchestrate must be single, single-review or pipeline")
+	}
+	options.Orchestrate = orchestrateMode
+	if orchestrateMode == "pipeline" {
+		delegate.EnablePipeline()
+		options.PipelinePrecondition = delegate.MissingStages
+		prompt = pipelineOrchestratorPrompt + prompt
+	}
+	// 审查模型未配置而本次运行会用到审查：启动即告警并留痕，不等到门禁时才发现。
+	if options.Contract != nil && options.Contract.Review && reviewerBase == nil {
+		record.Reviewer.Degraded = true
+		record.Reviewer.Reason = "reviewer-provider not configured"
+		sink.Emit(harness.Event{Time: time.Now().UTC(), Kind: harness.ReviewDegraded,
+			Data: "reviewer-provider not configured; gate reviews run on the developer model"})
+		fmt.Fprintln(os.Stderr, "[xcode] WARNING: reviewer model is not configured (reviewer-provider is empty); gate reviews will run on the DEVELOPER model — configure a second provider for cross-model review")
+	}
 	result, agentErr := agent.RunWithOptions(ctx, prompt, options)
 	record.Answer, record.StopReason, record.Steps = result.Answer, result.StopReason, result.Steps
 	// 日志写入失败只提示，不掩盖也不替代 Agent 本身的运行结果。
@@ -715,3 +790,12 @@ func check(err error) {
 		os.Exit(1)
 	}
 }
+
+// pipelineOrchestratorPrompt 流水线编排者的职责前导；文本只是引导，
+// 真正的硬约束在工具收窄、工位顺序校验与完成门禁前置条件里。
+var pipelineOrchestratorPrompt = `[pipeline orchestrator] You coordinate a staged pipeline. You must NOT edit code yourself — your only tools are delegate and git_diff.
+Stage 1: delegate role=planner with the user's task. The planner produces a structured diagnosis report: relevant files with paths, root-cause hypothesis, a reproduction command, and the functions to change.
+Stage 2: delegate role=developer, passing the planner's report VERBATIM together with the original task. Only the developer may edit files; it implements the fix and runs the repository's tests.
+Stage 3: After the developer reports back, inspect the diff with git_diff if useful, then state that the work is complete. The completion gate independently verifies with tests and a cross-model reviewer; if it reports issues, delegate the developer again with the concrete issues.
+
+`
