@@ -161,3 +161,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o .eval/pilot-rerun/bu
 ## 2026-11-09 未见题第二轮(round 2)
 
 探索门禁的验证轮。10 道冻结题,公平完成的 6 道中 5 道通过(dayjs×3、sympy×2),全部早编辑、干净收尾;sympy 12489 暴露了门禁的执行侧漏洞——Provider"记得"未声明工具并继续调用,已修复为响应级剪除(`99bdd81`)。cli 三道因 DeepSeek 余额耗尽中断、django 一道补丁导出丢失,均保留为基础设施事件。完整分析见 [第二轮报告](UNSEEN_R2_REPORT.md)。
+
+## 2026-11-10 第三轮:多智能体首验(round 3)
+
+10 道新冻结题、委派开放、共享预算。**核心发现:10 道里 7 道 delegate 调用为零——"开放委派"不等于"使用委派",本轮实际不构成多智能体对照**;真正的 3 道多智能体运行(dayjs)1 过 2 败。过程中根治两个旧问题:capture 脚本的 Python 3.6 兼容(轮 2 django-9296 的追溯根因)、单条非法流式工具调用杀死整轮运行。完整分析见 [第三轮报告](UNSEEN_R3_REPORT.md)。
