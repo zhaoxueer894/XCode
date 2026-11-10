@@ -8,14 +8,16 @@ cd /mnt/d/Projects/XCode
 export PYTHONPATH="$PWD" DOCKER_CONFIG="$PWD/.cache/docker-config" PYTHONUNBUFFERED=1
 PY=.cache/harbor-linux/bin/python
 HARBOR=.cache/harbor-linux/bin/harbor
-CREDS=~/ds-key2.txt
-GLM_KEY=$(sed -n 's/^api-key:[[:space:]]*//p' ~/glm-key.txt 2>/dev/null | head -1)
+# 唯一凭据来源:项目根的 .xcode/config(单文件配置,密钥不入库)。
+CONFIG=/mnt/d/Projects/XCode/.xcode/config
+CREDS=$CONFIG
+GLM_KEY=$(sed -n 's/^glm-api-key=//p' "$CONFIG" | head -1)
 
 step() { echo; echo "===== [$(date -u +%Y-%m-%dT%H:%M:%SZ)] $1 ====="; }
 
 step "preflight: credentials and binary"
-test -s "$CREDS" || { echo "FATAL: $CREDS missing"; exit 1; }
-if [ -z "$GLM_KEY" ]; then echo "FATAL: ~/glm-key.txt missing (cells B/C need the cross-model reviewer)"; exit 1; fi
+test -s "$CREDS" || { echo "FATAL: $CONFIG missing"; exit 1; }
+if [ -z "$GLM_KEY" ]; then echo "FATAL: glm-api-key not set in .xcode/config (cells B/C need the cross-model reviewer)"; exit 1; fi
 export GLM_API_KEY="$GLM_KEY"
 # 余额预检:仅做一次最小 chat 调用;余额不足立即终止,避免 B/C 全程降级污染消融。
 PREFLIGHT=$(curl -s --max-time 30 -x "http://$(ip route show default | awk '{print $3}'):7897" \
