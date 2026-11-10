@@ -22,7 +22,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--round", required=True, help="round key matching select_unseen.py")
     args = parser.parse_args()
-    round_dirs = {"ten": "unseen-ten", "r2": "unseen-r2"}
+    round_dirs = {"ten": "unseen-ten", "r2": "unseen-r2", "r3": "unseen-r3"}
     run_dir = ROOT / ".eval" / round_dirs[args.round]
     selection = json.loads((run_dir / "selection.json").read_text(encoding="utf-8"))
     results = []

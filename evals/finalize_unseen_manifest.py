@@ -33,12 +33,13 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--round", choices=["ten", "r2"], required=True)
+    parser.add_argument("--round", choices=["ten", "r2", "r3"], required=True)
     parser.add_argument("--gold-job", default="gold-v1", help="comma-separated job list; first hit wins")
     parser.add_argument("--empty-job", default="empty-v1", help="comma-separated job list; first hit wins")
     args = parser.parse_args()
     round_dirs = {"ten": ("unseen-ten", ["gold-v3"], ["empty-v1"]),
-                  "r2": ("unseen-r2", args.gold_job.split(","), args.empty_job.split(","))}
+                  "r2": ("unseen-r2", args.gold_job.split(","), args.empty_job.split(",")),
+                  "r3": ("unseen-r3", args.gold_job.split(","), args.empty_job.split(","))}
     run_dir_name, gold_jobs, empty_jobs = round_dirs[args.round]
     RUN = ROOT / ".eval" / run_dir_name
     candidates = json.loads((ROOT / f"evals/unseen-{args.round}-candidates.json").read_text(encoding="utf-8"))

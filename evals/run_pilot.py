@@ -160,7 +160,7 @@ def main() -> None:
         binary=OUTPUT/"build/xcode-linux-amd64"
         run_job(args.agent_job,eligible,"evals.harbor_agent:XCodeAgent",{
             "binary_path":str(binary),"provider":"deepseek","credentials_file":str(args.credentials_file),
-            "workspace":"auto","conda_env":"auto","no_delegate":True,
+            "workspace":"auto","conda_env":"auto","no_delegate":bool(budget.get("no_delegate", True)),
             "context_strategy":budget.get("context_strategy","none"),"context_budget":budget.get("context_budget",12000),
             "max_model_calls":budget["max_model_calls"],"max_tokens":budget["max_tokens"],
             "max_steps":budget["max_steps"],"timeout_sec":budget["timeout_sec"]},args.concurrency)

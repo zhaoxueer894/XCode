@@ -62,8 +62,15 @@ ROUNDS = {
         ("sympy__sympy", None, "sympy/sympy", "/testbed", "python", VER, 12096, 3),
         ("django__django", None, "django/django", "/testbed", "python", VER, 7530, 3),
     ],
+    # r3(多智能体首验):沿用四个合格仓库,r2 地板之上各取前 3,池 12、冻结上限 10。
+    "r3": [
+        ("cli__cli", "cli__cli_dataset.jsonl", "", "/home/cli", "go", MSB, 402, 3),
+        ("iamkun__dayjs", "iamkun__dayjs_dataset.jsonl", "", "/home/dayjs", "javascript", MSB, 569, 3),
+        ("sympy__sympy", None, "sympy/sympy", "/testbed", "python", VER, 12489, 3),
+        ("django__django", None, "django/django", "/testbed", "python", VER, 10554, 3),
+    ],
 }
-ROUND_DIRS = {"ten": "unseen-ten", "r2": "unseen-r2"}
+ROUND_DIRS = {"ten": "unseen-ten", "r2": "unseen-r2", "r3": "unseen-r3"}
 
 
 def pinned_record(row: dict) -> tuple[bytes, str]:

@@ -71,6 +71,18 @@ SELECTION_POLICIES = {
         "replacement after calibration begins. Grading rule protected-upstream is fixed "
         "before the run. First model exposure to every task in the pool."
     ),
+    "r3": (
+        "Third unseen round: FIRST real-repo exposure of the multi-agent design. "
+        "Same mechanical scope as round two (the four qualified repos cli/dayjs/"
+        "sympy/django), first THREE unused F2P tasks past the round-two floors "
+        "(cli>402, dayjs>569, sympy>12489, django>10554), pool 12, frozen set = "
+        "first TEN passing gold/empty calibration, no replacement. Delegate "
+        "(planner/developer/reviewer) is ENABLED for the model runs; known "
+        "limitation recorded: the exploration gate applies per agent on its own "
+        "progress snapshot, not aggregated across sub-agents. Single-agent "
+        "baseline for directional comparison is round two on a different frozen "
+        "set. Grading rule protected-upstream fixed before the run."
+    ),
 }
 
 
@@ -80,7 +92,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--round", choices=sorted(SELECTION_POLICIES), required=True)
     args = parser.parse_args()
-    round_dirs = {"ten": "unseen-ten", "r2": "unseen-r2"}
+    round_dirs = {"ten": "unseen-ten", "r2": "unseen-r2", "r3": "unseen-r3"}
     run_dir = ROOT / ".eval" / round_dirs[args.round]
     selection = json.loads((run_dir / "selection.json").read_text(encoding="utf-8"))
     digests = {item["id"]: item for item in json.loads((run_dir / "digests.json").read_text(encoding="utf-8"))}
@@ -112,6 +124,10 @@ def main() -> None:
             task["image_digest"] = None
             task["image_unavailable"] = True
         tasks.append(task)
+    agent = dict(AGENT)
+    if args.round == "r3":
+        agent["no_delegate"] = False
+        agent["delegate"] = "enabled (planner/developer/reviewer, shared run budget)"
     manifest = {
         "schema_version": 1,
         "execution_environment": {
@@ -122,7 +138,7 @@ def main() -> None:
         },
         "selection_policy": SELECTION_POLICIES[args.round],
         "harness_revisions": HARNESS_REVISIONS,
-        "agent": AGENT,
+        "agent": agent,
         "frozen_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "tasks": tasks,
     }
