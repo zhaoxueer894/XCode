@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "execution_environment": {
+    "cpus": 2,
+    "memory_mb": 4096,
+    "go_env": {
+      "GOMAXPROCS": "2",
+      "GOFLAGS": "-p=2"
+    },
+    "reason": "Align pre-cgroup-aware Go runtimes and package parallelism to the actual container CPU quota; tests and upstream graders are unchanged."
+  },
+  "selection_policy": "Third unseen round: FIRST real-repo exposure of the multi-agent design. Same mechanical scope as round two (the four qualified repos cli/dayjs/sympy/django), first THREE unused F2P tasks past the round-two floors (cli>402, dayjs>569, sympy>12489, django>10554), pool 12, frozen set = first TEN passing gold/empty calibration, no replacement. Delegate (planner/developer/reviewer) is ENABLED for the model runs; known limitation recorded: the exploration gate applies per agent on its own progress snapshot, not aggregated across sub-agents. Single-agent baseline for directional comparison is round two on a different frozen set. Grading rule protected-upstream fixed before the run.",
+  "harness_revisions": {
+    "multi_swe_bench": "24f493f8a103e72312ded4f6b9c89f081d69cb09",
+    "swebench": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+    "swebench_tasks": "3d07b464b7b311a0cbfb5ed5b2d8a3b96f84a33d",
+    "harbor": "0.25.0"
+  },
+  "agent": {
+    "model": "deepseek-flash",
+    "thinking": "enabled",
+    "reasoning_effort": "high",
+    "no_delegate": false,
+    "max_model_calls": 100,
+    "max_tokens": 200000,
+    "max_steps": 100,
+    "timeout_sec": 1200,
+    "max_output_tokens": 8192,
+    "provider_retries": 0,
+    "context_strategy": "bounded",
+    "context_budget": 6000,
+    "runtime_budget_guidance": true,
+    "runtime_progress_guidance": true,
+    "early_wrap_up_and_final_request_tools_off": true,
+    "delegate": "enabled (planner/developer/reviewer, shared run budget)"
+  },
+  "frozen_at_utc": "2026-11-10T06:14:50.934858+00:00",
+  "tasks": [
+    {
+      "id": "cli__cli-405",
+      "language": "go",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "cli/cli",
+      "base_commit": "c27d7807a06a01c1248f85957cba5bf23d16aae0",
+      "workspace": "/home/cli",
+      "record_sha256": "fe20d1fd5e530762133a1db2f9f4b9c04c182dc5979e08880a5adde0f98ffd60",
+      "f2p_count": 1,
+      "p2p_count": 51,
+      "dataset_file": "cli__cli_dataset.jsonl",
+      "image": "mswebench/cli_m_cli:pr-405",
+      "image_digest": "mswebench/cli_m_cli@sha256:cff87488292ecba0c413387e4ccf2b63924d06eec5b92ca0ef293932743f9565"
+    },
+    {
+      "id": "iamkun__dayjs-589",
+      "language": "javascript",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "iamkun/dayjs",
+      "base_commit": "de14682fa5e5815d73ae3d377b499321648c20ba",
+      "workspace": "/home/dayjs",
+      "record_sha256": "99ab545238a7d808a7fbe4ff9cdfa23ec26b3316bd4085ed9656058ecaac50e4",
+      "f2p_count": 1,
+      "p2p_count": 38,
+      "dataset_file": "iamkun__dayjs_dataset.jsonl",
+      "image": "mswebench/iamkun_m_dayjs:pr-589",
+      "image_digest": "mswebench/iamkun_m_dayjs@sha256:187011e0a68167f1448aa120402e7f333debb00a5dd99ac130e5c931cf6dccde"
+    },
+    {
+      "id": "sympy__sympy-13031",
+      "language": "python",
+      "dataset": "SWE-bench/SWE-bench_Verified",
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "repository": "sympy/sympy",
+      "base_commit": "2dfa7457f20ee187fbb09b5b6a1631da4458388c",
+      "workspace": "/testbed",
+      "record_sha256": "973f31853f2647e3564014301a930e3114605ddb2d30078eacfdc9c3d6b55f4f",
+      "f2p_count": 1,
+      "p2p_count": 9,
+      "image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-13031:latest",
+      "image_digest": "swebench/sweb.eval.x86_64.sympy_1776_sympy-13031@sha256:067e63442eb90f260defbdd2ecb27bb8389449ba889cc7f98fbb1c7585e37b49"
+    },
+    {
+      "id": "django__django-10880",
+      "language": "python",
+      "dataset": "SWE-bench/SWE-bench_Verified",
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "repository": "django/django",
+      "base_commit": "838e432e3e5519c5383d12018e6c78f8ec7833c1",
+      "workspace": "/testbed",
+      "record_sha256": "748b4167880465471ec6953ef1be5e3262fed7e339e33e7a93f4877cecc6b3cb",
+      "f2p_count": 1,
+      "p2p_count": 55,
+      "image": "swebench/sweb.eval.x86_64.django_1776_django-10880:latest",
+      "image_digest": "swebench/sweb.eval.x86_64.django_1776_django-10880@sha256:94e6ba5d96b1a1db8bc6fd117c03728d6a7453ddb723dc4484f48bd22efc968d"
+    },
+    {
+      "id": "cli__cli-474",
+      "language": "go",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "cli/cli",
+      "base_commit": "55b66feb423019879fa1ce6a7718a79b6b7ff0c0",
+      "workspace": "/home/cli",
+      "record_sha256": "17dab3564a20fc8e07be4381f7e99b6b053c73fce95b5161ba00db99e167df73",
+      "f2p_count": 2,
+      "p2p_count": 108,
+      "dataset_file": "cli__cli_dataset.jsonl",
+      "image": "mswebench/cli_m_cli:pr-474",
+      "image_digest": "mswebench/cli_m_cli@sha256:411148078d8f282193151f0543a1e85032b0598ea57f4617cc441d0c3810e328"
+    },
+    {
+      "id": "iamkun__dayjs-591",
+      "language": "javascript",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "iamkun/dayjs",
+      "base_commit": "de14682fa5e5815d73ae3d377b499321648c20ba",
+      "workspace": "/home/dayjs",
+      "record_sha256": "672f535ef42e7d6a5dcf5fca34ffcbc614e449114ca64bcc0a3bd2e73cf79672",
+      "f2p_count": 1,
+      "p2p_count": 38,
+      "dataset_file": "iamkun__dayjs_dataset.jsonl",
+      "image": "mswebench/iamkun_m_dayjs:pr-591",
+      "image_digest": "mswebench/iamkun_m_dayjs@sha256:af41a75114d1cd05e687405a9e24cfc767be611600189d0ead23c6a536ccdcc8"
+    },
+    {
+      "id": "sympy__sympy-13091",
+      "language": "python",
+      "dataset": "SWE-bench/SWE-bench_Verified",
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "repository": "sympy/sympy",
+      "base_commit": "d1320814eda6549996190618a21eaf212cfd4d1e",
+      "workspace": "/testbed",
+      "record_sha256": "d69d23602d27f65047b2c42a845b0703e31c86ef2f45ee2dae23a004abcca49c",
+      "f2p_count": 2,
+      "p2p_count": 89,
+      "image": "swebench/sweb.eval.x86_64.sympy_1776_sympy-13091:latest",
+      "image_digest": "swebench/sweb.eval.x86_64.sympy_1776_sympy-13091@sha256:0b025245e81c4ce1d888f3b3088ef220f20661d8241c0c50797ebf3a46d393ac"
+    },
+    {
+      "id": "django__django-10914",
+      "language": "python",
+      "dataset": "SWE-bench/SWE-bench_Verified",
+      "dataset_revision": "78f471bf655a3137b2e8a75af1501690ec009ec3",
+      "repository": "django/django",
+      "base_commit": "e7fd69d051eaa67cb17f172a39b57253e9cb831a",
+      "workspace": "/testbed",
+      "record_sha256": "8eb2710dcd842c8e9f027b73c0e4e945da736b49d68f2c011bd8ae2eea25e00c",
+      "f2p_count": 1,
+      "p2p_count": 98,
+      "image": "swebench/sweb.eval.x86_64.django_1776_django-10914:latest",
+      "image_digest": "swebench/sweb.eval.x86_64.django_1776_django-10914@sha256:f26f0db931c6c1e785ab8287e1ea4f5f948846267db159deaf90b3fe7adea4e9"
+    },
+    {
+      "id": "cli__cli-477",
+      "language": "go",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "cli/cli",
+      "base_commit": "10ea161f9281c80e31fb5b45cfba2dc22e586a67",
+      "workspace": "/home/cli",
+      "record_sha256": "2b22b8f833c3dd3fc4415035157b91ca5653fdbbf92ed46e3e63c0297484fd6d",
+      "f2p_count": 1,
+      "p2p_count": 90,
+      "dataset_file": "cli__cli_dataset.jsonl",
+      "image": "mswebench/cli_m_cli:pr-477",
+      "image_digest": "mswebench/cli_m_cli@sha256:3f89147d7d578acde53e7e03fb7f35e4d64c379910e8aedc1fe712ae2ce64b54"
+    },
+    {
+      "id": "iamkun__dayjs-602",
+      "language": "javascript",
+      "dataset": "ByteDance-Seed/Multi-SWE-bench",
+      "dataset_revision": "56ff018c04a38e27ada1e9d0a6d5839a51f88f0d",
+      "repository": "iamkun/dayjs",
+      "base_commit": "1761ebab0fbba36e401624379289e3777312d9b1",
+      "workspace": "/home/dayjs",
+      "record_sha256": "d2891b571b07a0f255ae0118f1e7ba3d7ca57c1e8144de9ad4f3e019429a98c0",
+      "f2p_count": 2,
+      "p2p_count": 38,
+      "dataset_file": "iamkun__dayjs_dataset.jsonl",
+      "image": "mswebench/iamkun_m_dayjs:pr-602",
+      "image_digest": "mswebench/iamkun_m_dayjs@sha256:fb41e0f2f68e53ae564a99abcd5099f6d78a6bc102c546b3f99eb5f5f7debf06"
+    }
+  ],
+  "calibration": {
+    "gold_jobs": [
+      "gold-v1"
+    ],
+    "empty_jobs": [
+      "empty-v1"
+    ],
+    "rule": "first TEN tasks in frozen order whose gold passes and empty fails; no replacement",
+    "excluded": [],
+    "audit_file": ".eval/unseen-r3/calibration-audit.json"
+  }
+}
