@@ -1,7 +1,7 @@
 package harness_test
 
-// 流水线模式的回归测试：工位顺序硬校验、完成门禁前置条件、
-// 按编排模式过滤声明工具、planner 工位预算上限强制产出报告。
+// Pipeline regression tests: stage order enforcement, gate precondition,
+// advertised-tool filtering per orchestrate mode, planner stage cap.
 
 import (
 	"context"
@@ -13,8 +13,8 @@ import (
 	"xcode/internal/harness"
 )
 
-// scriptedSubagentFactory 让 delegate 的每个子智能体都由脚本模型驱动：
-// planner/developer 各返回一段固定文本后结束。
+// scriptedSubagentFactory: every sub-agent is driven by a scripted model
+// returning one fixed reply per role.
 func scriptedSubagentFactory(responses map[string]string) harness.SubagentFactory {
 	subRegistry, err := harness.NewRegistry(staticTool{name: "read_file", output: "content"})
 	if err != nil {
@@ -45,7 +45,7 @@ func TestPipelineOrderEnforcesPlannerFirst(t *testing.T) {
 	model := modelFunc(func(_ context.Context, _ []harness.Message, _ []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
 		step++
 		switch step {
-		case 1: // 抢跑：developer 先于 planner，必须被硬性拒绝。
+		case 1: // Jumping ahead: developer before planner must be rejected.
 			call := harness.ToolCall{ID: "early-dev", Name: "delegate", Arguments: json.RawMessage(`{"role":"developer","prompt":"fix it"}`)}
 			return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 5}}, nil
 		case 2:
@@ -55,10 +55,10 @@ func TestPipelineOrderEnforcesPlannerFirst(t *testing.T) {
 			call := harness.ToolCall{ID: "dev", Name: "delegate", Arguments: json.RawMessage(`{"role":"developer","prompt":"implement per report"}`)}
 			return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 5}}, nil
 		}
-		// 第 4 步读取抢跑错误的内容断言已在消息历史里。
+		// Step 4 just returns; the assertion ran on the captured observations.
 		return harness.ModelResponse{Content: "done", Usage: harness.Usage{TotalTokens: 5}}, nil
 	})
-	// 捕获 tool 观察结果以断言顺序错误信息。
+	// Capture tool observations to assert the order error.
 	capturing := harness.NewAgent(&observationCapturer{inner: model, sink: &observations}, registry, 8, nil)
 	if _, err := capturing.Run(context.Background(), "fix"); err != nil {
 		t.Fatal(err)
@@ -72,7 +72,7 @@ func TestPipelineOrderEnforcesPlannerFirst(t *testing.T) {
 	}
 }
 
-// observationCapturer 把每条 tool 观察追加到切片，再转发给内部模型。
+// observationCapturer records every tool observation, then forwards.
 type observationCapturer struct {
 	inner harness.Model
 	sink  *[]string
@@ -108,7 +108,7 @@ func TestPipelineGatePreconditionBlocksEarlyCompletion(t *testing.T) {
 			}
 		}
 		switch step {
-		case 1: // 未走工位就声称完成：门禁必须以前置条件拦截。
+		case 1: // Claiming completion before any stage ran must be blocked.
 			return harness.ModelResponse{Content: "done", Usage: harness.Usage{TotalTokens: 5}}, nil
 		case 2:
 			call := harness.ToolCall{ID: "plan", Name: "delegate", Arguments: json.RawMessage(`{"role":"planner","prompt":"diagnose"}`)}
@@ -188,7 +188,7 @@ func TestPlannerStageCapForcesFinalAnswer(t *testing.T) {
 	})
 	planner := budget.Wrap(model, "sub:planner")
 	ctx := context.Background()
-	_, _ = planner.Generate(ctx, nil, []harness.ToolSpec{{Name: "read_file"}}, nil) // 用 40，超 30% 上限
+	_, _ = planner.Generate(ctx, nil, []harness.ToolSpec{{Name: "read_file"}}, nil) // spends 40, over the 30% cap
 	_, _ = planner.Generate(ctx, nil, []harness.ToolSpec{{Name: "read_file"}}, nil)
 	if len(toolCounts) != 2 || toolCounts[1] != 0 {
 		t.Fatalf("second request must have tools disabled after the stage cap, got %v", toolCounts)

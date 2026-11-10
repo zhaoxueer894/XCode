@@ -16,7 +16,7 @@ type ModelBudget struct {
 	maxCalls, maxTokens int
 	calls, missingUsage int
 	usage               Usage
-	usageByPurpose      map[string]Usage // 按 Wrap 的 purpose 分账；流水线工位预算上限据此判定。
+	usageByPurpose      map[string]Usage // per-purpose accounting; stage budget caps read this
 	sink                EventSink
 }
 
@@ -62,9 +62,10 @@ func (m *budgetModel) Generate(ctx context.Context, messages []Message, tools []
 	spent, missing := b.usage.TotalTokens, b.missingUsage
 	b.mu.Unlock()
 	id := fmt.Sprintf("model-%06d", call)
-	// 流水线 planner 工位上限：诊断阶段最多消耗全 run token 预算的 30%。
-	// 到上限不硬杀（那样 planner 永远"未完成"，developer 会被顺序校验卡死），
-	// 而是按最后请求处理：禁用工具，强制产出结构化诊断报告。
+	// Planner stage cap: diagnosis may spend at most 30% of the run token
+	// budget. On reaching the cap the planner is treated as final (tools off,
+	// forced to emit its report) instead of being killed — a killed planner
+	// stays "incomplete" forever and deadlocks the developer order check.
 	stageCapped := false
 	if strings.HasPrefix(m.purpose, "sub:planner") && b.maxTokens > 0 {
 		b.mu.Lock()
@@ -139,17 +140,18 @@ func (m *budgetModel) Generate(ctx context.Context, messages []Message, tools []
 	return response, err
 }
 
-// 探索门禁阈值：剩余预算份额低于该值且该智能体尚无 apply_patch 生产修改时，
-// 按等级移除探索类工具。数值来自 2026-11-09 未见题轮的轨迹证据：4/5 失败题
-// 零生产修改烧满预算，文本催促被无视 15+ 轮；硬性收窄与最后请求禁工具同理。
+// Exploration gate thresholds: with no observed production edit, falling
+// below the remaining-budget share removes exploration tools step by step.
+// Calibrated from observed failure traces: runs that burned the whole budget
+// without editing ignored text nudges for 15+ rounds; hard narrowing works.
 const (
 	explorationNoSearchBelow = 0.5 // 剩余不足一半：禁 search_text / list_files
 	explorationNoExecBelow   = 0.3 // 剩余不足三成：再禁 exec，只留读/改/diff
 )
 
-// restrictExplorationTools 按门禁等级过滤工具声明；返回新切片，不改调用方数据。
-// read_file / apply_patch / git_diff 任何等级都保留：门禁的目的是强制转入实现，
-// 不是禁止实现。delegate 模式下各智能体按自身进度快照受同一规则约束。
+// restrictExplorationTools filters the advertised tool set by gate level;
+// it returns a new slice. read_file/apply_patch/git_diff stay at every level:
+// the gate forces switching to implementation, it never blocks implementing.
 func restrictExplorationTools(specs []ToolSpec, gate int) []ToolSpec {
 	blocked := map[string]bool{"search_text": true, "list_files": true}
 	if gate >= 2 {
@@ -164,8 +166,9 @@ func restrictExplorationTools(specs []ToolSpec, gate int) []ToolSpec {
 	return kept
 }
 
-// pruneWithheldToolCalls 移除不在当次声明列表里的工具调用（final 时全部移除）。
-// 剪除发生在响应进入消息历史之前，助手消息不会包含被剪调用，协议保持一致。
+// pruneWithheldToolCalls drops calls outside the advertised set (all of them
+// when final). Pruning happens before the response enters the transcript, so
+// the assistant message never references dropped calls and stays consistent.
 func pruneWithheldToolCalls(calls []ToolCall, advertised []ToolSpec) []ToolCall {
 	if len(calls) == 0 {
 		return calls
@@ -183,10 +186,10 @@ func pruneWithheldToolCalls(calls []ToolCall, advertised []ToolSpec) []ToolCall 
 	return kept
 }
 
-// guidance 生成每次模型请求前的运行时提示，并返回该请求是否为预算内最后一个允许
-// 的请求（final），以及探索门禁等级（gate：0 无、1 禁搜索、2 禁搜索+执行）。
-// final 时调用方禁用全部工具；gate>0 时按级收窄。两者依据的都是请求时刻的快照，
-// 一旦观察到生产修改，门禁在下一请求立即解除。
+// guidance builds the per-request runtime notice and reports whether this
+// is the last admitted request (final) plus the exploration gate level
+// (0 none, 1 no-search, 2 no-search-no-exec). Both re-evaluate per request;
+// the gate lifts as soon as a production edit is observed.
 func (b *ModelBudget) guidance(ctx context.Context, call, spent, missing int) (string, bool, int) {
 	calls, tokens := "unlimited", "unlimited"
 	fraction := 1.0
@@ -213,8 +216,8 @@ func (b *ModelBudget) guidance(ctx context.Context, call, spent, missing int) (s
 	if deadline, ok := ctx.Deadline(); ok {
 		clock = fmt.Sprintf("%.0f seconds", max(0, time.Until(deadline).Seconds()))
 	}
-	// 探索门禁只在能读到该智能体的进度快照且尚无生产修改时触发；
-	// 直接调用模型（无快照）不受影响，交互式无限预算也不受影响。
+	// The gate needs a progress snapshot with zero production edits; direct
+	// model calls without a snapshot and unlimited interactive budgets are unaffected.
 	progress, hasProgress := ctx.Value(runtimeProgressKey{}).(*runtimeProgress)
 	gate := 0
 	if hasProgress && progress.ProductionEdits == 0 {

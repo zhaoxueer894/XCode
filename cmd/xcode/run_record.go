@@ -38,8 +38,8 @@ type runRecord struct {
 	Error          string                      `json:"error,omitempty"`
 }
 
-// ReviewerRecord 记录跨模型审查的配置与降级状态；降级绝不静默——
-// 未配置或运行期降级都会在此留痕，供评测与事后审计核对。
+// ReviewerRecord captures the cross-model reviewer configuration and any
+// degradation; unconfigured or runtime fallbacks are recorded, never silent.
 type ReviewerRecord struct {
 	Configured bool   `json:"configured"`
 	Provider   string `json:"provider,omitempty"`

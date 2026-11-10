@@ -276,8 +276,8 @@ func runCLI(args []string) (runErr error) {
 	defer stop()
 	ctx, cancel := context.WithTimeout(signalContext, *timeout)
 	defer cancel()
-	// run 级共享进度账本：主智能体与全部子智能体共用同一本账，探索门禁据此判定
-	// "这个 run 是否有人改过生产代码"，而不是"某个智能体自己改没改"。
+	// Run-level shared progress ledger: one account for the orchestrator and
+	// every sub-agent; gates judge per run, not per agent.
 	ctx = harness.WithRunProgress(ctx)
 
 	// 完整工具结果保存在本地 Artifact Store，模型消息只接收受限预览。
@@ -301,11 +301,11 @@ func runCLI(args []string) (runErr error) {
 	if err != nil {
 		return err
 	}
-	// baseModel 是未包预算的原始模型：delegate 工厂按子智能体角色重新包装
-	// （purpose=sub:<role>），预算分账与 planner 工位上限据此区分。
+	// baseModel is the unwrapped model; the delegate factory re-wraps it per
+	// role (purpose=sub:<role>) so budget accounting and stage caps can differ.
 	baseModel := selectedModel
-	// 跨模型审查模型：reviewer-provider 未配置时保持 nil（门禁审查降级为
-	// 开发者同模型并三重警告，绝不静默）。
+	// Cross-model reviewer base; nil when reviewer-provider is unset (gate
+	// reviews degrade to the developer model with a triple warning).
 	var reviewerBase harness.Model
 	if rp := strings.TrimSpace(*reviewerProvider); rp != "" {
 		reviewerBase, record.Reviewer.Model, err = buildReviewerModel(appConfig, rp, *reviewerModel, *providerRetries)
@@ -387,10 +387,11 @@ func runCLI(args []string) (runErr error) {
 			runSub := func(model harness.Model) (string, error) {
 				return harness.NewAgent(model, subExecutor, maxSteps, subSink).Run(ctx, prompt)
 			}
-			// 跨模型审查：reviewer 工位优先用独立审查模型；运行期失败（非预算
-			// 耗尽、非取消）时把"这一次审查"降级为开发者同模型执行——
-			// stderr 横幅 + review.degraded 事件 + 运行记录打标，三重警告不静默；
-			// 下一道门禁仍会先重试原配置的审查模型。
+			// Reviewer role: prefer the dedicated reviewer model. On a runtime
+			// failure (not budget exhaustion, not cancellation) this one review
+			// degrades to the developer model with a triple warning (stderr banner,
+			// review.degraded event, run-record mark); the next gate attempt
+			// retries the configured reviewer first.
 			if strings.EqualFold(role, "reviewer") && reviewerBase != nil {
 				result, runErr := runSub(budget.Wrap(reviewerBase, "sub:reviewer"))
 				if runErr == nil {
@@ -503,6 +504,14 @@ func runCLI(args []string) (runErr error) {
 	// 是否启用由 --typed-shadow 决定；jev 后端发起的真实调用由用户把关。
 	if *typedShadow && strings.EqualFold(*contextStrategy, "decision-gated") {
 		backend := appConfig.TypedClassifierBackend
+		// The jev switch is the primary control: on forces the TypeSafe
+		// systemone backend, off falls back to the local chat model.
+		switch strings.ToLower(strings.TrimSpace(appConfig.Jev)) {
+		case "on":
+			backend = "jev"
+		case "off":
+			backend = "local"
+		}
 		if strings.TrimSpace(backend) == "" {
 			backend = "local"
 		}
@@ -614,8 +623,9 @@ func runCLI(args []string) (runErr error) {
 		fmt.Fprintf(os.Stderr, "[xcode] completion gate enabled: %d verify command(s), review=%t\n",
 			len(contract.VerifyCommands), contract.Review)
 	}
-	// 编排模式：single / single-review / pipeline。模式决定向模型声明的工具集
-	// （agent 层过滤），流水线额外启用工位顺序硬校验与门禁前置条件。
+	// Orchestration mode picks the advertised tool set (filtered in the agent
+	// loop); pipeline additionally enables stage order checks and the gate
+	// precondition.
 	orchestrateMode := strings.ToLower(strings.TrimSpace(*orchestrate))
 	switch orchestrateMode {
 	case "", "single":
@@ -640,7 +650,8 @@ func runCLI(args []string) (runErr error) {
 		options.PipelinePrecondition = delegate.MissingStages
 		prompt = pipelineOrchestratorPrompt + prompt
 	}
-	// 审查模型未配置而本次运行会用到审查：启动即告警并留痕，不等到门禁时才发现。
+	// A review is expected but no reviewer model is configured: warn and mark
+	// at startup instead of discovering it mid-gate.
 	if options.Contract != nil && options.Contract.Review && reviewerBase == nil {
 		record.Reviewer.Degraded = true
 		record.Reviewer.Reason = "reviewer-provider not configured"
@@ -791,8 +802,8 @@ func check(err error) {
 	}
 }
 
-// pipelineOrchestratorPrompt 流水线编排者的职责前导；文本只是引导，
-// 真正的硬约束在工具收窄、工位顺序校验与完成门禁前置条件里。
+// pipelineOrchestratorPrompt is guidance only; the hard constraints live in
+// tool narrowing, stage order checks and the gate precondition.
 var pipelineOrchestratorPrompt = `[pipeline orchestrator] You coordinate a staged pipeline. You must NOT edit code yourself — your only tools are delegate and git_diff.
 Stage 1: delegate role=planner with the user's task. The planner produces a structured diagnosis report: relevant files with paths, root-cause hypothesis, a reproduction command, and the functions to change.
 Stage 2: delegate role=developer, passing the planner's report VERBATIM together with the original task. Only the developer may edit files; it implements the fix and runs the repository's tests.

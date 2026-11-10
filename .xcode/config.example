@@ -1,39 +1,41 @@
-# XCode 配置模板 —— 复制为本目录下的 config 文件后填写(Windows: copy / 项目管理器复制)
-#   cp .xcode/config.example .xcode/config
-# config 文件已被 .gitignore 排除,你的密钥不会被提交。
-# 优先级:命令行 flag > 项目 .xcode/config > 全局 ~/.xcode/config > 环境变量 > 默认值。
+# XCode configuration (key=value, one per line). Copy this file to .xcode/config
+# and fill in your keys. .xcode/config is gitignored and never enters git.
+# Priority: CLI flags > project .xcode/config > global ~/.xcode/config > env > defaults.
 
-# ===== 开发者模型(必填一项)=====
-provider=deepseek            # deepseek / bailian / glm / demo(离线假模型)
-
-# DeepSeek(https://platform.deepseek.com)
+# ---- Developer model (fill one provider) ----
+provider=deepseek
 deepseek-api-key=sk-...
 # deepseek-base-url=https://api.deepseek.com
 # deepseek-model=deepseek-flash
 
-# 或 阿里云百炼通义(https://bailian.console.aliyun.com)
 # provider=bailian
 # bailian-api-key=sk-...
 # bailian-model=qwen-plus
 
-# 或 智谱 GLM(https://open.bigmodel.cn)
 # provider=glm
 # glm-api-key=...
 # glm-model=glm-4.6
 
-# ===== 跨模型审查(可选,推荐)=====
-# 完成门禁的独立 reviewer 用不同供应商的模型,盲区互补。
-# 不配置时自动降级为开发者同模型,并打印警告(不会静默)。
+# ---- Cross-model reviewer (optional) ----
+# Independent reviewer for the completion gate (blind spots differ from the
+# developer model). Unset or failing reviewers fall back to the developer
+# model with a warning; never silent.
 # reviewer-provider=glm
 # reviewer-model=glm-4.6
-# (密钥复用上面的 glm-api-key,不需要重复填)
 
-# ===== 编排模式(可选)=====
-# 留空 = 全工具智能体;可选 single / single-review / pipeline
-# 详见 README「编排模式与跨模型审查」
+# ---- Orchestration (optional) ----
+# empty = full-tool agent; single | single-review | pipeline (see README)
 # orchestrate=
 
-# ===== 运行参数(可选,一般用默认)=====
+# ---- jev compression classifier (optional) ----
+# on = use the TypeSafe systemone classifier (requires the keys below);
+# off = use the local chat-model classifier. Default off.
+# jev=off
+# typesafe-api-key=...
+# typesafe-endpoint=...
+# typesafe-model=...
+
+# ---- Runtime (optional) ----
 # mode=workspace-write
 # context-strategy=bounded
 # context-budget=6000

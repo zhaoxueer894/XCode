@@ -8,7 +8,7 @@ cd /mnt/d/Projects/XCode
 export PYTHONPATH="$PWD" DOCKER_CONFIG="$PWD/.cache/docker-config" PYTHONUNBUFFERED=1
 PY=.cache/harbor-linux/bin/python
 HARBOR=.cache/harbor-linux/bin/harbor
-# 唯一凭据来源:项目根的 .xcode/config(单文件配置,密钥不入库)。
+# Single source of credentials: the project .xcode/config (gitignored).
 CONFIG=/mnt/d/Projects/XCode/.xcode/config
 CREDS=$CONFIG
 GLM_KEY=$(sed -n 's/^glm-api-key=//p' "$CONFIG" | head -1)
@@ -19,7 +19,8 @@ step "preflight: credentials and binary"
 test -s "$CREDS" || { echo "FATAL: $CONFIG missing"; exit 1; }
 if [ -z "$GLM_KEY" ]; then echo "FATAL: glm-api-key not set in .xcode/config (cells B/C need the cross-model reviewer)"; exit 1; fi
 export GLM_API_KEY="$GLM_KEY"
-# 余额预检:仅做一次最小 chat 调用;余额不足立即终止,避免 B/C 全程降级污染消融。
+# Preflight: one minimal chat call; abort on insufficient balance so cells
+# B/C never run fully degraded (that would invalidate the ablation).
 PREFLIGHT=$(curl -s --max-time 30 -x "http://$(ip route show default | awk '{print $3}'):7897" \
   "https://open.bigmodel.cn/api/paas/v4/chat/completions" \
   -H "Authorization: Bearer $GLM_KEY" -H "Content-Type: application/json" \
@@ -38,11 +39,12 @@ BIN_SHA=$(sha256sum bin/xcode-linux-amd64 | awk '{print $1}')
 for CELL in a-single b-single-review c-pipeline; do
   step "cell $CELL"
   RUN=.eval/ablation/$CELL
-  # 二进制与版本快照:该格运行时的确切构建。
+  # Snapshot the exact binary that ran this cell.
   mkdir -p "$RUN/build"
   cp bin/xcode-linux-amd64 "$RUN/build/xcode-linux-amd64"
   printf '%s\n%s\n' "$GIT_REV" "$BIN_SHA" > "$RUN/meta.txt"
-  # 从清单读编排与 reviewer 配置,显式传参,和落盘 manifest 完全一致。
+  # Read orchestrate/reviewer from the cell manifest; args mirror the
+  # recorded manifest exactly.
   ORCH=$($PY - "$RUN/manifest.json" <<'PYEOF'
 import json, sys
 agent = json.load(open(sys.argv[1]))["agent"]

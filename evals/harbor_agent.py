@@ -105,7 +105,8 @@ class XCodeAgent(BaseInstalledAgent):
                     f"{prefix}_BASE_URL", "https://api.deepseek.com" if self.provider == "deepseek" else "https://dashscope.aliyuncs.com/compatible-mode/v1"
                 ),
             }
-        # 跨模型审查：GLM 凭据仅以环境变量进入容器，命令行文本与上传文件不含密钥。
+        # Cross-model reviewer: GLM credentials reach the container only as env
+        # vars; never in command text or uploaded files.
         for name in ("GLM_API_KEY", "GLM_MODEL", "GLM_BASE_URL"):
             value = self._extra_env.get(name) or os.environ.get(name)
             if value:

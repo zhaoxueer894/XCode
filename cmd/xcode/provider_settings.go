@@ -62,7 +62,7 @@ func deepseekSettings(cfg config.Config, thinking, effort string, retries, outpu
 	return settings
 }
 
-// glmSettings 构建 glm 客户端配置；modelOverride 非空时覆盖模型名（reviewer-model）。
+// glmSettings builds the glm client config; modelOverride (reviewer-model) wins.
 func glmSettings(cfg config.Config, modelOverride string, retries int) glm.Config {
 	return glm.Config{
 		APIKey:         pick(cfg.GlmAPIKey, os.Getenv("GLM_API_KEY")),
@@ -73,8 +73,9 @@ func glmSettings(cfg config.Config, modelOverride string, retries int) glm.Confi
 	}
 }
 
-// buildReviewerModel 构建跨模型审查模型；modelOverride 非空时覆盖该供应商默认模型。
-// 返回的模型未包预算（由调用方按 sub:reviewer 用途包装）；第二个返回值为生效模型名。
+// buildReviewerModel builds the cross-model reviewer; a non-empty
+// modelOverride replaces the provider default. The returned model is not
+// budget-wrapped (the caller wraps it as sub:reviewer).
 func buildReviewerModel(cfg config.Config, provider, modelOverride string, retries int) (harness.Model, string, error) {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "glm":

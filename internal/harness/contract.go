@@ -61,8 +61,8 @@ func (a *Agent) runCompletionGate(ctx context.Context, step int, options RunOpti
 	contract := options.Contract
 	result := gateResult{}
 
-	// 第零步：流水线前置条件——编排者声称完成但工位未走完时直接拦截。
-	// 这是硬约束：文本指令教不会编排者按序派活，顺序错误在这里被物理拒绝。
+	// Step zero: pipeline preconditions. A claim made before the stages ran
+	// is rejected outright — hard structure, not prompt advice.
 	if options.PipelinePrecondition != nil {
 		if missing := options.PipelinePrecondition(); len(missing) > 0 {
 			result.Reasons = append(result.Reasons, missing...)

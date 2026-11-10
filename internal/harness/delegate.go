@@ -25,22 +25,23 @@ type Delegate struct {
 	eventSink     EventSink       // 父的事件接收端，由接线方注入。
 	mu            sync.Mutex      // 保护子智能体编号自增与流水线工位状态。
 	nextID        int             // 下一个子智能体编号。
-	// 流水线模式（编排者只做分发）：强制 planner → developer 顺序，并记录
-	// 各工位是否完成，供完成门禁做前置条件拦截。
+	// Pipeline mode (orchestrator only routes): enforces planner before
+	// developer and tracks stage completion for the gate precondition.
 	pipeline      bool
 	plannerDone   bool
 	developerDone bool
 }
 
-// EnablePipeline 打开流水线模式：role 必填，developer 必须在 planner 完成后才能派出。
+// EnablePipeline turns on pipeline mode: role is required and the developer
+// may only be spawned after the planner completed.
 func (d *Delegate) EnablePipeline() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.pipeline = true
 }
 
-// MissingStages 返回流水线尚未完成的工位；非流水线模式恒为空。
-// 完成门禁据此拦截"编排者声称完成但 developer 从未运行"的情况。
+// MissingStages lists unfinished pipeline stages (empty off-pipeline).
+// The completion gate uses it to reject claims made before the developer ran.
 func (d *Delegate) MissingStages() []string {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -110,7 +111,7 @@ func (d *Delegate) Execute(ctx context.Context, raw json.RawMessage) (ToolResult
 	if args.MaxSteps < 1 || args.MaxSteps > 16 {
 		return ToolResult{}, fmt.Errorf("max_steps must be between 1 and 16")
 	}
-	// 流水线顺序硬校验：developer 之前必须已有 planner 的诊断报告。
+	// Hard order check: the developer needs the planner's diagnosis report.
 	role := strings.ToLower(strings.TrimSpace(args.Role))
 	d.mu.Lock()
 	pipeline, plannerDone := d.pipeline, d.plannerDone
@@ -162,7 +163,8 @@ func (d *Delegate) Execute(ctx context.Context, raw json.RawMessage) (ToolResult
 		return ToolResult{}, fmt.Errorf("subagent %s: %w", agentID, err)
 	}
 	d.emitComplete(agentID, args.Role, truncateRunes(result, 200))
-	// 工位完成记账：只有成功返回才算完成，失败的工位允许重派。
+	// Stage accounting: only successful returns mark a stage complete;
+	// failed stages may be re-delegated.
 	d.mu.Lock()
 	switch role {
 	case "planner":

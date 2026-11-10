@@ -38,19 +38,20 @@ type RunOptions struct {
 	ResumePending        []ToolCall             // 保存对账后判定可安全重试的未完成调用；仅恢复路径使用，普通 Run 保持 nil。
 	Contract             *TaskContract          // 完成门禁契约；nil 表示本运行不启用门禁，行为与原实现一致。
 	WorkspaceFingerprint func() (string, error) // 返回当前工作区内容指纹；nil 时验证证据不与工作区版本绑定。
-	// Orchestrate 选择编排模式，决定向模型声明的工具集：
-	//   ""              现状（全部工具，delegate 可用）
-	//   "single"        单智能体（不向模型声明 delegate；门禁审查仍可走 delegate 机制）
-	//   "single-review" 单智能体 + 完成门禁审查（模型侧同 single，审查由门禁强制）
-	//   "pipeline"      流水线编排者：只声明 delegate 与 git_diff，禁止亲自改代码
+	// Orchestrate selects the collaboration topology and the advertised tool set:
+	//   ""              full-tool agent (delegate available)
+	//   "single"        single agent; delegate is not advertised
+	//   "single-review" single agent + mandatory gate review
+	//   "pipeline"      orchestrator with only delegate and git_diff advertised
 	Orchestrate string
-	// PipelinePrecondition 返回流水线尚未完成的工位描述；非空时完成门禁拒绝放行。
-	// 用于"编排者声称完成但 developer 从未运行"的硬拦截。
+	// PipelinePrecondition lists unfinished pipeline stages; a non-empty list
+	// blocks the completion gate (claims done before the developer ever ran).
 	PipelinePrecondition func() []string
 }
 
-// advertisedTools 按编排模式过滤向模型声明的工具；执行侧不受影响（门禁仍可
-// 通过 runner 调 delegate），配合 budgetModel 的响应级剪除构成双重防线。
+// advertisedTools filters the advertised tool set by orchestration mode.
+// Execution is unaffected (the gate still reaches delegate through the runner);
+// paired with the response-side pruning this is defense in depth.
 func advertisedTools(specs []ToolSpec, orchestrate string) []ToolSpec {
 	switch orchestrate {
 	case "single", "single-review":

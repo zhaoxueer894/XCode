@@ -157,7 +157,8 @@ func TestFinalBudgetRequestDisablesToolsByCallLimit(t *testing.T) {
 }
 
 func TestFinalBudgetRequestDisablesToolsByTokenShare(t *testing.T) {
-	// 每次请求花 96 token：第二次请求前剩余 4，不足预算的 5%，按最后一请求处理。
+	// Each request spends 96 tokens; 4 remain before request two, under the
+	// 5% share, so it is treated as the final request.
 	budget := harness.NewModelBudget(0, 100, nil)
 	var toolCounts []int
 	model := budget.Wrap(modelFunc(func(_ context.Context, _ []harness.Message, tools []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
@@ -192,7 +193,8 @@ func TestBudgetGuidanceUrgesFinishAfterVerifiedProductionEdit(t *testing.T) {
 			}
 		}
 		if step == 4 {
-			// 第二次生产编辑后成功命令计数必须清零：旧的成功结果没有见过最新改动。
+			// A new production edit must reset the success counter: old green
+			// runs never saw the newest change.
 			if !strings.Contains(notice, "0 tool calls and 0 successful command(s)") {
 				t.Fatalf("successful-command counter not reset: %s", notice)
 			}
@@ -213,7 +215,8 @@ func TestBudgetGuidanceUrgesFinishAfterVerifiedProductionEdit(t *testing.T) {
 	}
 }
 
-// failingExecTool 模拟退出码非 0 的命令：观察文本无关紧要，结构化退出码才是事实源。
+// failingExecTool simulates a non-zero exit; the structured exit code is
+// the source of truth, not the observation text.
 type failingExecTool struct{}
 
 func (failingExecTool) Spec() harness.ToolSpec { return harness.ToolSpec{Name: "exec"} }
@@ -244,7 +247,7 @@ func TestBudgetGuidanceFlagsUnverifiedProductionEdit(t *testing.T) {
 			call := harness.ToolCall{ID: "edit-1", Name: "apply_patch", Arguments: json.RawMessage(`{"path":"source.go","operation":"update"}`)}
 			return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 10}}, nil
 		}
-		// 参数逐次变化，避免触发相邻相同调用的 doom-loop 保护。
+		// Vary arguments to avoid the adjacent-duplicate doom-loop guard.
 		call := harness.ToolCall{ID: fmt.Sprintf("fail-%d", step), Name: "exec", Arguments: json.RawMessage(fmt.Sprintf(`{"command":["go","test","-run","Case%d"]}`, step))}
 		return harness.ModelResponse{ToolCalls: []harness.ToolCall{call}, Usage: harness.Usage{TotalTokens: 10}}, nil
 	})
@@ -304,7 +307,8 @@ func TestExplorationGateNarrowsToolsUntilFirstProductionEdit(t *testing.T) {
 				t.Fatalf("missing closed directive: %s", notice)
 			}
 		case 11:
-			// 第 10 轮已做生产修改：门禁必须立即解除，exec 恢复供验证使用。
+			// A production edit happened at step 10: the gate must lift at once
+			// and restore exec for verification.
 			if len(tools) != 5 {
 				t.Fatalf("gate must lift after a production edit, got %d tools", len(tools))
 			}
@@ -346,8 +350,8 @@ func TestGatePrunesWithheldToolCallsFromResponse(t *testing.T) {
 			executed = append(executed, e.Tool)
 		}
 	})
-	// 第 7 次请求进入 level-1 门禁（剩余 6/12）：声明里没有 search_text，
-	// 但模型仍按"记忆"返回一次 search_text 调用——它必须被剪掉、不进执行。
+	// Request 7 enters gate level 1 (6/12 remaining): search_text is not
+	// advertised, but the model emits one from memory — it must be pruned.
 	step := 0
 	model := modelFunc(func(_ context.Context, _ []harness.Message, tools []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
 		step++
@@ -381,8 +385,9 @@ func TestGatePrunesWithheldToolCallsFromResponse(t *testing.T) {
 	}
 }
 
-// TestSubagentSharesRunProgressLedger 验证 run 级共享账本：父智能体改过生产代码后，
-// 晚出生的子智能体在自己的首个请求里就看到这次修改，不会被当成零编辑而触发门禁。
+// TestSubagentSharesRunProgressLedger: after the parent edits production
+// code, a late-spawned sub-agent sees the edit in its very first request and
+// is not treated as zero-edit by the exploration gate.
 func TestSubagentSharesRunProgressLedger(t *testing.T) {
 	budget := harness.NewModelBudget(20, 2000, nil)
 	var subNotice string

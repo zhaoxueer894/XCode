@@ -21,11 +21,12 @@ type runtimeProgress struct {
 	ExecOKAfterEdit int
 }
 
-// WithRunProgress 把一个 run 级共享进度账本放入 ctx，返回新的 ctx。
-// 主智能体与全部子智能体必须读写同一本账：探索门禁与运行时提示据此判定
-// "这个 run 是否有人改过生产代码"，而不是"某个智能体自己改没改"——否则
-// 晚期出生的子智能体会因自己的空白账本在出生瞬间被门禁收走工具。
-// CLI 在启动时调用一次；未注入时 Agent.Run 退回私有账本（单智能体等价）。
+// WithRunProgress stores a run-level shared progress ledger in ctx. The
+// orchestrator and every sub-agent must share one ledger: gates and runtime
+// hints judge "has anyone edited production code in this run", not "did this
+// particular agent edit" — otherwise late-spawned sub-agents are crippled at
+// birth by their empty private ledger. Injected once by the CLI; without it
+// Agent.Run falls back to a private ledger (single-agent equivalent).
 func WithRunProgress(ctx context.Context) context.Context {
 	if _, ok := ctx.Value(runtimeProgressKey{}).(*runtimeProgress); ok {
 		return ctx
@@ -33,7 +34,7 @@ func WithRunProgress(ctx context.Context) context.Context {
 	return context.WithValue(ctx, runtimeProgressKey{}, &runtimeProgress{})
 }
 
-// runtimeProgressFromContext 返回 ctx 中的共享账本；不存在时返回新账本。
+// runtimeProgressFromContext returns the shared ledger, or a fresh one.
 func runtimeProgressFromContext(ctx context.Context) *runtimeProgress {
 	if progress, ok := ctx.Value(runtimeProgressKey{}).(*runtimeProgress); ok {
 		return progress

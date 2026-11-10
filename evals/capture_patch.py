@@ -39,8 +39,9 @@ def capture_patch(workspace, base_commit, output):
         allowed = sorted({name for name in names if name and name != b".env"
                           and name != b".xcode-state" and not name.startswith(b".xcode-state/")})
         if allowed:
-            # -f：allowed 只含基线已跟踪与可见新文件的显式枚举，强制添加不会带入
-            # 垃圾；而部分仓库(.gitignore 覆盖 .vscode 等)的已跟踪路径不加 -f 会被拒。
+            # -f: allowed is an explicit enumeration of base-tracked and visible
+            # new files, so force-adding cannot pull in junk; without -f, tracked
+            # paths covered by .gitignore are rejected by git.
             git("add", "-f", "-A", "--pathspec-from-file=-", "--pathspec-file-nul", input=b"\0".join(allowed)+b"\0")
         patch = git("diff", "--cached", "--binary", "--full-index", base_commit, "--")
     output.parent.mkdir(parents=True, exist_ok=True)
