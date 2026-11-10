@@ -79,7 +79,7 @@ deepseek-model=deepseek-flash
 
 长对话会被压缩以节省上下文。压缩时 XCode 把历史拆成一个个"证据单元"，决定哪些保留、哪些截断、哪些丢弃——默认由内置规则决定。如果你想用模型来做这些决定，有两种后端：
 
-- **local**：用百炼的 qwen 聊天模型当分类器，直接复用配置文件里的 `bailian-*` 三个键，零额外配置。
+- **local**：默认复用主模型当分类器，零额外配置；也可用 `typed-classifier-api-key/-endpoint/-model` 指定专门的分类模型（不填钥匙时回退百炼键）。
 - **jev**：调用 TypeSafe 的 systemone 分类服务。需要在配置文件（`~/.xcode/config`）追加三个键：
 
   ```ini
