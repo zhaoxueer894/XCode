@@ -27,44 +27,50 @@ XCode 是一个用 Go 写的多智能体编码工具。你给它一个任务（�
 
 ## 快速开始
 
-需要 Go 1.26+。你可以通过本项目的“假模型”先建立手感，熟悉后再配置API KEY。它不是语言模型，而是一段写死在源码里的确定性逻辑，让你零成本把整条流程跑起来，以及给自动化测试和离线评测提供复现能力。
+需要 Go 1.26+。编译后直接运行，首次会在终端弹出模型选择菜单（不想用菜单就直接编辑配置文件，见下一节）：
 
 ```bash
 go build -o bin/xcode.exe ./cmd/xcode
-bin/xcode.exe --provider demo "please read go.mod"
+bin/xcode.exe               # 交互模式（REPL 多轮对话）
+bin/xcode.exe "修个 bug"     # 一次性任务
 ```
 
-具体行为也就一条：把提示词的最后一个词当文件名，发起一次 `read_file`，然后照本宣科地返回结果。它不会理解你的任务，更不会真的修 bug——**真实任务请接下面的真实模型**。
+不想每次敲 `bin/xcode.exe` 的话，可选安装到用户 PATH（不装也完全可用）：
+
+```bash
+bin/xcode.exe install       # 复制到用户目录并写入 PATH；新开终端后直接运行 xcode
+```
+
+不配置任何真实模型时会使用 demo 假模型：一段写死在源码里的确定性逻辑（把提示词最后一个词当文件名读一次），让你零成本跑通整条流程，也给自动化测试和离线评测提供复现能力。它不会理解你的任务，更不会真的修 bug——**真实任务请按下一节配置真实模型**。
 
 ## 配置模型
 
-也支持 DeepSeek。可以直接使用仓库外的配置文本，无需把密钥复制进项目：
+所有模型配置收敛在一个文件：**全局 `~/.xcode/config`**（Windows 即 `C:\Users\<你>\.xcode\config`）。首次运行向导帮你写的就是它；手动编辑完全等价。项目级 `.xcode/config` 可按需覆盖全局。取值优先级：命令行 flag > 项目配置 > 全局配置 > 环境变量 > 内置默认。
 
-```bash
-bin/xcode.exe --model-config C:/private/deepseek.txt "修复这个项目的问题并运行测试"
+```ini
+# 默认供应商：demo / bailian / deepseek
+provider=bailian
+
+# 通义千问（阿里云百炼）
+bailian-api-key=sk-xxxxxxxx
+bailian-base-url=https://dashscope.aliyuncs.com/compatible-mode/v1
+bailian-model=qwen-plus
+
+# DeepSeek（base-url 有默认值，通常只填 key 和 model）
+deepseek-api-key=sk-xxxxxxxx
+deepseek-base-url=https://api.deepseek.com
+deepseek-model=deepseek-flash
 ```
 
-文本中的 `model:` 指定实际模型，`api-key:` 后填写密钥。默认启用思考并保留连续工具调用需要的思考状态；运行记录不包含密钥。也可使用 `--provider deepseek`，通过 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` 配置。
+要点：
 
-主模型用的是**阿里云百炼的通义千问**（默认 `qwen-plus`，可换成百炼上的其他模型），通过百炼的 OpenAI 兼容接口调用。按以下三步完成配置：
+- base-url 和 model 都有默认值，只填 api-key 也能跑；三家的键完全对称。
+- Key 只建议写在全局配置（在仓库外，不会被误提交）；往项目 `.xcode/config` 写 Key 前请注意它可能随仓库提交。
+- 环境变量（`DASHSCOPE_API_KEY`、`DEEPSEEK_API_KEY` 等）仍然有效，但只作为 CI 等无配置文件场景的注入兜底。
+- 配了 Key 但 provider 还是 demo 时，启动会主动询问是否切换，不会再静默跑假模型。
+- `--provider` flag 保留，用于临时覆盖或脚本场景。
 
-1. 在项目根目录创建 `.env` 文件（模板见 `.env.example`），填入你在百炼控制台拿到的 API Key：
-
-   ```
-   DASHSCOPE_API_KEY=sk-xxxxxxxx
-   DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-   DASHSCOPE_MODEL=qwen-plus
-   ```
-
-2. Linux/macOS 下把权限收紧到 `chmod 600 .env`；这个文件已被 `.gitignore` 排除，不会被提交。
-
-3. 运行时通过 `--provider bailian` 显式选择真实模型：
-
-   ```bash
-   bin/xcode.exe --provider bailian "修复 utils.go 里的越界问题并运行 go test"
-   ```
-
-   不想每次敲 flag 的话，在 `.xcode/config` 里写一行 `provider=bailian` 即可。注意：只配 `.env` 不切 provider 的话，跑的仍然是 demo 模型。
+> **从旧版本升级**：`.env` 和 `--model-config` 已移除。启动时若检测到旧 `.env` 会打印一次性迁移提示，把 Key 搬进上面的配置文件即可。
 
 ## 可选：压缩决策分类器（jev）
 
@@ -72,13 +78,13 @@ bin/xcode.exe --model-config C:/private/deepseek.txt "修复这个项目的问�
 
 长对话会被压缩以节省上下文。压缩时 XCode 把历史拆成一个个"证据单元"，决定哪些保留、哪些截断、哪些丢弃——默认由内置规则决定。如果你想用模型来做这些决定，有两种后端：
 
-- **local**：用百炼的 qwen 聊天模型当分类器，直接复用 `.env` 里的 Key，零额外配置。
-- **jev**：调用 TypeSafe 的 systemone 分类服务。需要单独申请并设置三个环境变量：
+- **local**：用百炼的 qwen 聊天模型当分类器，直接复用配置文件里的 `bailian-*` 三个键，零额外配置。
+- **jev**：调用 TypeSafe 的 systemone 分类服务。需要在配置文件（`~/.xcode/config`）追加三个键：
 
-  ```
-  TYPESAFE_API_KEY=你的密钥
-  TYPESAFE_ENDPOINT=服务端点地址
-  TYPESAFE_MODEL=模型名
+  ```ini
+  typesafe-api-key=你的密钥
+  typesafe-endpoint=服务端点地址
+  typesafe-model=模型名
   ```
 
   然后在 `.xcode/config` 里写 `typed-classifier=jev`（不写默认 local），运行时加 `--typed-shadow` 开启。
@@ -89,26 +95,28 @@ shadow 指的是分类结果只记录、不生效——真实压缩仍走规则�
 
 ### 一次性任务
 
-位置参数就是任务描述，整句用引号包起来：
+位置参数就是任务描述，整句用引号包起来；provider 默认取自配置文件：
 
 ```bash
-bin/xcode.exe --provider bailian --workspace D:/path/to/repo "修复登录超时的 bug，改完跑通 go test"
+bin/xcode.exe --workspace D:/path/to/repo "修复登录超时的 bug，改完跑通 go test"
 ```
 
 运行中会实时显示每一步：读了哪些文件、执行了什么命令、策略判定和审批；结束后打印停止原因和本次 token 用量。
 
 ### 交互模式（多轮对话）
 
-不带任务直接启动就进入 REPL，可以连续对话，上下文跨轮保留：
+不带任务直接启动就进入 REPL，可以连续对话，上下文跨轮保留（provider 取自配置文件；装过 `xcode install` 的话直接敲 `xcode`）：
 
 ```bash
-bin/xcode.exe --provider bailian
+bin/xcode.exe
 ```
 
 REPL 内置几个斜杠命令：
 
 ```text
 /status             当前 provider、轮数、累计 token、已改文件、测试状态
+/model              切换模型供应商：菜单选择（或 /model deepseek 直接指定），
+                     写入配置文件并立即生效，对话历史保留
 /compact            压缩对话历史，释放上下文（工作笔记保留）
 /trust go test      信任某个命令前缀，本会话内执行它不再弹审批
 /clear              清空会话历史（项目记忆保留）
@@ -122,7 +130,7 @@ REPL 内置几个斜杠命令：
 任务跑到一半进程被杀（崩溃、断电、误关终端），加 `--resume` 从最后一个安全边界续跑，已完成的步骤不会重做：
 
 ```bash
-bin/xcode.exe --provider bailian --resume
+bin/xcode.exe --resume
 ```
 
 未完成的工具调用按副作用分别处理：只读的自动重试；改文件的先核对实际状态再重放；执行结果说不清的（比如一条 exec）一律列出来等你确认，绝不自作主张重跑。
@@ -143,7 +151,7 @@ bin/xcode.exe --provider bailian --resume
 ```
 
 ```bash
-bin/xcode.exe --provider bailian --contract task.json "修复 utils.go 里的越界问题"
+bin/xcode.exe --contract task.json "修复 utils.go 里的越界问题"
 ```
 
 模型声称完成时，XCode 会在当前工作区真实运行 `verify_commands`，并派 reviewer 复查；不通过就打回继续修，直到通过或预算耗尽。
@@ -176,6 +184,7 @@ bin/xcode.exe eval compare --baseline qwen-full --current .eval/<新run目录>
 ### 辅助命令
 
 ```text
+xcode install                 可选：安装到用户 PATH，之后直接敲 xcode（卸载=删文件+移除PATH条目）
 xcode checkpoints                查看历次写前快照
 xcode restore --id <快照ID>      恢复到指定快照（需交互确认）
 xcode journal                    查看工具调用状态机（含崩溃窗口留下的 unknown）
@@ -190,6 +199,7 @@ xcode eval-fault                 故障注入评测：对比不同压缩/恢复�
 
 ```text
 provider=bailian          # demo / bailian / deepseek
+bailian-api-key=sk-...    # 供应商凭据三键见"配置模型"一节；base-url/model 有默认值
 mode=workspace-write      # plan / workspace-write / full-access
 context-strategy=bounded  # bounded / none / sliding / handoff / compaction / decision-gated
 context-budget=6000      # 模型可见历史的估算 token 目标；不含工具说明

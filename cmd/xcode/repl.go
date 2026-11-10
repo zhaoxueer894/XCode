@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"xcode/internal/config"
 	"xcode/internal/harness"
 	"xcode/internal/policy"
 )
@@ -26,6 +27,8 @@ type replConfig struct {
 	Workspace string
 	Timeout   time.Duration
 	Engine    *policy.Engine // /trust 命令需要向策略引擎添加规则。
+	// SwitchProvider 由 main 装配：/model 切换时重载配置并重建模型，返回新的展示名。
+	SwitchProvider func(provider string) (string, error)
 }
 
 // sessionPath 返回会话持久化文件路径。
@@ -55,7 +58,7 @@ func runInteractive(baseCtx context.Context, session *harness.Session, cfg replC
 
 		// 斜杠命令不进入模型。
 		if strings.HasPrefix(input, "/") {
-			if exit := handleSlash(input, session, cfg); exit {
+			if exit := handleSlash(input, session, &cfg, scanner); exit {
 				break
 			}
 			continue
@@ -103,8 +106,9 @@ func runInteractive(baseCtx context.Context, session *harness.Session, cfg replC
 	return nil
 }
 
-// handleSlash 处理斜杠命令；返回 true 表示退出 REPL。
-func handleSlash(input string, session *harness.Session, cfg replConfig) bool {
+// handleSlash 处理斜杠命令；返回 true 表示退出 REPL。cfg 与 scanner 供 /model 的
+// 菜单追问读取后续输入行。
+func handleSlash(input string, session *harness.Session, cfg *replConfig, scanner *bufio.Scanner) bool {
 	parts := strings.Fields(input)
 	cmd := strings.ToLower(parts[0])
 
@@ -136,9 +140,15 @@ func handleSlash(input string, session *harness.Session, cfg replConfig) bool {
 		fmt.Println("  /exit   退出")
 		fmt.Println("  /clear  清空会话历史")
 		fmt.Println("  /status 显示当前状态")
+		fmt.Println("  /model  切换模型供应商（菜单选择，写入配置并立即生效）")
+		fmt.Println("  /setup  同 /model：重新选择模型")
 		fmt.Println("  /compact 压缩对话历史（保留工作笔记）")
 		fmt.Println("  /trust <cmd> 信任命令前缀（本会话免审批）")
 		fmt.Println("  /help   显示此帮助")
+		return false
+
+	case "/model", "/setup":
+		switchModelCommand(cfg, scanner, parts)
 		return false
 
 	case "/compact":
@@ -164,6 +174,71 @@ func handleSlash(input string, session *harness.Session, cfg replConfig) bool {
 		fmt.Printf("未知命令 %s（/help 查看可用命令）\n", cmd)
 		return false
 	}
+}
+
+// switchModelCommand 实现 /model 与 /setup：菜单（或直接参数）选择供应商，
+// 校验 Key → 写入全局配置（下次启动沿用）→ 热切换当前会话模型。
+func switchModelCommand(cfg *replConfig, scanner *bufio.Scanner, parts []string) {
+	globalPath, err := config.GlobalPath()
+	if err != nil {
+		fmt.Println("error: 无法定位全局配置路径")
+		return
+	}
+	choice := ""
+	if len(parts) > 1 {
+		if provider, ok := parseWizardChoice(parts[1]); ok {
+			choice = provider
+		} else {
+			fmt.Printf("未知 provider %s（可选：%s）\n", parts[1], strings.Join(wizardProviders, " / "))
+			return
+		}
+	} else {
+		printProviderMenu("选择要使用的模型（当前: "+cfg.Provider+"）", globalPath)
+		for attempt := 0; attempt < 3; attempt++ {
+			fmt.Print("输入序号并回车（直接回车取消）：")
+			if !scanner.Scan() {
+				return
+			}
+			answer := scanner.Text()
+			if strings.TrimSpace(answer) == "" {
+				return
+			}
+			if provider, ok := parseWizardChoice(answer); ok {
+				choice = provider
+				break
+			}
+			fmt.Println("无法识别，请输入 1-3。")
+		}
+	}
+	if choice == "" || choice == cfg.Provider {
+		if choice == cfg.Provider {
+			fmt.Printf("已在使用 %s，未更改。\n", choice)
+		}
+		return
+	}
+	// 选真实供应商但 Key 缺失：指引而不是带错误切换。
+	if choice != "demo" {
+		fresh, loadErr := config.Load(cfg.Workspace)
+		if loadErr == nil && !providerKeyConfigured(fresh, choice) {
+			fmt.Printf("未找到 %s 的 API Key。请编辑 %s，在 %s 后填入后重试 /model。\n",
+				choice, globalPath, providerKeyHint(choice))
+			return
+		}
+	}
+	if cfg.SwitchProvider == nil {
+		fmt.Println("error: 当前会话不支持运行中切换模型（重启后生效配置写入）")
+		return
+	}
+	modelName, switchErr := cfg.SwitchProvider(choice)
+	if switchErr != nil {
+		fmt.Printf("error: 切换失败：%v\n", switchErr)
+		return
+	}
+	if err := config.Upsert(globalPath, "provider", choice); err != nil {
+		fmt.Printf("warning: 写入配置失败（%v）；本次会话已切换，下次启动需重试 /model。\n", err)
+	}
+	cfg.Provider, cfg.Model = choice, modelName
+	fmt.Printf("✓ 已切换到 %s（下一轮生效；provider=%s 已写入 %s）\n", wizardProviderLabel(choice), choice, globalPath)
 }
 
 // offerResume 检查是否有上次会话，提示用户是否恢复。

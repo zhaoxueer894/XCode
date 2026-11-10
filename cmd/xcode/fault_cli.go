@@ -53,15 +53,10 @@ func runFaultEval(ctx context.Context, args []string) error {
 	if strings.TrimSpace(typedClassifierDefault) == "" {
 		typedClassifierDefault = "local"
 	}
-	typedClassifier := flags.String("typed-classifier", typedClassifierDefault, "typed shadow classifier backend: local (chat LLM) or jev (TypeSafe systemone; requires TYPESAFE_API_KEY and user approval for real calls)")
+	typedClassifier := flags.String("typed-classifier", typedClassifierDefault, "typed shadow classifier backend: local (chat LLM) or jev (TypeSafe systemone; requires typesafe-api-key config and user approval for real calls)")
 	typedClassifierEndpoint := flags.String("typed-classifier-endpoint", appConfig.TypedClassifierEndpoint, "local classifier OpenAI-compatible endpoint (config: typed-classifier-endpoint; empty = reuse main model)")
 	typedClassifierModel := flags.String("typed-classifier-model", appConfig.TypedClassifierModel, "local classifier model name (config: typed-classifier-model; empty = reuse main model)")
-	typedClassifierKeyEnv := flags.String("typed-classifier-api-key-env", appConfig.TypedClassifierKeyEnvVar, "env var name holding the local classifier API key (config: typed-classifier-api-key-env; empty = DASHSCOPE_API_KEY)")
 	typedApply := flags.Bool("typed-apply", false, "let the typed classifier APPLY its compaction decisions (effective decider with rule fallback); makes real classifier calls")
-	classifierKeyEnv := strings.TrimSpace(*typedClassifierKeyEnv)
-	if classifierKeyEnv == "" {
-		classifierKeyEnv = "DASHSCOPE_API_KEY"
-	}
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -73,7 +68,7 @@ func runFaultEval(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	selectedModel, err := buildModel(*provider)
+	selectedModel, err := buildModel(appConfig, *provider)
 	if err != nil {
 		return err
 	}
@@ -87,8 +82,8 @@ func runFaultEval(ctx context.Context, args []string) error {
 	}
 	modelName, providerEndpoint := "demo", ""
 	if strings.EqualFold(*provider, "bailian") {
-		modelName = envOrDefault("DASHSCOPE_MODEL", defaultBailianModel)
-		providerEndpoint = envOrDefault("DASHSCOPE_BASE_URL", defaultBailianBaseURL)
+		bailianRun := bailianSettings(appConfig, 2)
+		modelName, providerEndpoint = bailianRun.Model, bailianRun.BaseURL
 	}
 	harnessVersion, err := executableHarnessVersion()
 	if err != nil {
@@ -113,7 +108,7 @@ func runFaultEval(ctx context.Context, args []string) error {
 	// 栈装配回调：运行器每阶段调用一次；策略决定上下文策略与恢复日志的挂载。
 	build := func(ctx context.Context, ws string, task faulteval.FaultTask, sink harness.EventSink,
 		strategy faulteval.Strategy, skipSteps int) (*faulteval.Stack, error) {
-		return buildFaultStack(ctx, ws, task, sink, strategy, skipSteps, selectedModel, *provider, artifacts, config, classifierKeyEnv)
+		return buildFaultStack(ctx, ws, task, sink, strategy, skipSteps, selectedModel, *provider, artifacts, config, appConfig)
 	}
 	runner, err := faulteval.NewStackRunner(*outputDir, runID, config, build)
 	if err != nil {
@@ -143,7 +138,7 @@ func runFaultEval(ctx context.Context, args []string) error {
 // buildFaultStack 按策略装配一次阶段运行的完整栈；与 eval.go 的 execute 平行但语义不同。
 func buildFaultStack(ctx context.Context, ws string, task faulteval.FaultTask, sink harness.EventSink,
 	strategy faulteval.Strategy, skipSteps int, selectedModel harness.Model, provider string,
-	artifacts *artifactstore.FileStore, config faulteval.FaultConfig, classifierKeyEnv string) (*faulteval.Stack, error) {
+	artifacts *artifactstore.FileStore, config faulteval.FaultConfig, providerConfig config.Config) (*faulteval.Stack, error) {
 
 	contextStrategy := contextmgr.StrategyCompaction
 	if strategy == faulteval.StrategyDecisionGated {
@@ -181,7 +176,7 @@ func buildFaultStack(ctx context.Context, ws string, task faulteval.FaultTask, s
 	// jev 后端按约定：接线完成即可跑，是否发起真实调用由用户决定。
 	// 挂载条件:shadow(只对照)或 applied(拍板)任一开启;applied 时分类器为生效决策器。
 	if (config.TypedShadow || config.TypedApplied) && strategy == faulteval.StrategyDecisionGated {
-		if err := mountTypedShadow(manager, config.TypedClassifier, provider, selectedModel, config.TypedClassifierEndpoint, config.TypedClassifierModel, classifierKeyEnv, config.TypedApplied); err != nil {
+		if err := mountTypedShadow(manager, providerConfig, config.TypedClassifier, provider, selectedModel, config.TypedClassifierEndpoint, config.TypedClassifierModel, config.TypedApplied); err != nil {
 			return nil, err
 		}
 	}
@@ -267,7 +262,7 @@ func runFaultReplay(ctx context.Context, args []string) error {
 	if configErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: load config: %v\n", configErr)
 	}
-	selectedModel, err := buildModel(*provider)
+	selectedModel, err := buildModel(appConfig, *provider)
 	if err != nil {
 		return err
 	}
@@ -291,16 +286,12 @@ func runFaultReplay(ctx context.Context, args []string) error {
 		CatalogHash:    catalogHash,
 	}
 	if strings.EqualFold(*provider, "bailian") {
-		config.Model = envOrDefault("DASHSCOPE_MODEL", defaultBailianModel)
-		config.ProviderEndpoint = envOrDefault("DASHSCOPE_BASE_URL", defaultBailianBaseURL)
-	}
-	replayKeyEnv := strings.TrimSpace(appConfig.TypedClassifierKeyEnvVar)
-	if replayKeyEnv == "" {
-		replayKeyEnv = "DASHSCOPE_API_KEY"
+		bailianRun := bailianSettings(appConfig, 2)
+		config.Model, config.ProviderEndpoint = bailianRun.Model, bailianRun.BaseURL
 	}
 	build := func(ctx context.Context, ws string, task faulteval.FaultTask, sink harness.EventSink,
 		strategy faulteval.Strategy, skipSteps int) (*faulteval.Stack, error) {
-		return buildFaultStack(ctx, ws, task, sink, strategy, skipSteps, selectedModel, *provider, artifacts, config, replayKeyEnv)
+		return buildFaultStack(ctx, ws, task, sink, strategy, skipSteps, selectedModel, *provider, artifacts, config, appConfig)
 	}
 	runner, err := faulteval.NewStackRunner(*outputDir, "replay-"+time.Now().UTC().Format("20060102T150405.000000000Z"), config, build)
 	if err != nil {

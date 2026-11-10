@@ -8,12 +8,13 @@ package main
 import (
 	"context"       // 分类调用取消信号。
 	"encoding/json" // 构造证据单元参数。
-	"os"            // 读取门控开关与 .env 密钥。
+	"os"            // 读取门控开关与配置密钥。
 	"strconv"       // 延迟数字格式化。
-	"strings"       // .env 解析。
+	"strings"       // 拼接证据单元文本。
 	"testing"       // Go 标准测试框架。
 	"time"          // 延迟测量。
 
+	"xcode/internal/config"        // 读取仓库配置中的分类器凭据。
 	"xcode/internal/contextmgr"    // RuleDecider 与决策类型。
 	"xcode/internal/harness"       // 消息与模型协议。
 	"xcode/internal/model/bailian" // qwen 聊天分类器。
@@ -44,26 +45,22 @@ func benchUnits() []contextmgr.Unit {
 	return units
 }
 
-// loadBenchEnv 把项目根 .env 的 KEY=VALUE 注入进程环境（测试进程不会经过 main 的 loadDotEnv）。
+// loadBenchEnv 从仓库配置与环境变量装配分类器所需凭据（配置键优先）。
 func loadBenchEnv(t *testing.T) {
 	t.Helper()
-	// go test 的 CWD 是包目录（cmd/xcode），.env 在仓库根：逐级向上查找。
-	raw, err := os.ReadFile("../../.env")
+	// go test 的 CWD 是包目录（cmd/xcode），项目配置在仓库根。
+	cfg, err := config.Load("../..")
 	if err != nil {
-		t.Skip("no .env file; skipping classifier latency benchmark")
+		t.Skipf("load config: %v", err)
 	}
-	for _, line := range strings.Split(string(raw), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if name, value, ok := strings.Cut(line, "="); ok {
-			name = strings.TrimSpace(name)
-			value = strings.Trim(strings.TrimSpace(value), "\"'")
-			if os.Getenv(name) == "" {
-				os.Setenv(name, value)
-			}
-		}
+	if key := pick(cfg.BailianAPIKey, os.Getenv("DASHSCOPE_API_KEY")); key != "" {
+		os.Setenv("DASHSCOPE_API_KEY", key)
+	}
+	if url := pick(cfg.BailianBaseURL, os.Getenv("DASHSCOPE_BASE_URL")); url != "" {
+		os.Setenv("DASHSCOPE_BASE_URL", url)
+	}
+	if os.Getenv("DASHSCOPE_API_KEY") == "" {
+		t.Skip("no bailian API key configured; skipping classifier latency benchmark")
 	}
 }
 
@@ -117,12 +114,13 @@ func TestClassifierLatencyBenchmark(t *testing.T) {
 	ruleMeanMs := float64(time.Since(started).Microseconds()) / 1000.0 / 10000.0
 	t.Logf("%-28s calls=10000 mean=%.6fms（纯内存，无网络）", "RuleDecider (deterministic)", ruleMeanMs)
 
-	// 2) Jev systemone：一次批量调用判定全部单元。
-	apiKey := os.Getenv("TYPESAFE_API_KEY")
-	if apiKey == "" {
-		t.Fatal("XCODE_CLASSIFIER_BENCH=1 requires TYPESAFE_API_KEY for the jev backend")
+	// 2) Jev systemone：一次批量调用判定全部单元。凭据走配置取值链。
+	benchConfig, _ := config.Load("../..")
+	jevKey, jevEndpoint, jevModel := typesafeSettings(benchConfig)
+	if jevKey == "" {
+		t.Fatal("XCODE_CLASSIFIER_BENCH=1 requires typesafe-api-key (config) or TYPESAFE_API_KEY (env) for the jev backend")
 	}
-	jevClient, err := jev.New(apiKey, os.Getenv("TYPESAFE_ENDPOINT"), os.Getenv("TYPESAFE_MODEL"))
+	jevClient, err := jev.New(jevKey, jevEndpoint, jevModel)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,8 +151,8 @@ func TestClassifierLatencyBenchmark(t *testing.T) {
 
 	// 3) qwen 聊天分类器：Jev 诞生前的常用方案，一次 chat 调用判定全部单元。
 	classifierModel, err := bailian.New(bailian.Config{
-		APIKey:  os.Getenv("DASHSCOPE_API_KEY"),
-		BaseURL: os.Getenv("DASHSCOPE_BASE_URL"),
+		APIKey:  classifierKey(benchConfig),
+		BaseURL: pick(benchConfig.BailianBaseURL, os.Getenv("DASHSCOPE_BASE_URL")),
 		Model:   "qwen-plus",
 	})
 	if err != nil {

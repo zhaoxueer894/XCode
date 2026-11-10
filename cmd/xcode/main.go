@@ -3,17 +3,16 @@ package main
 // 提供用户可以直接运行的命令行程序
 
 import (
-	"bufio"         // 按行读取项目根目录中的 .env 配置。
+	"bufio"         // 逐行扫描旧版 .env 以生成迁移提示。
 	"context"       // 控制整次 Agent 运行的取消与超时。
 	"encoding/json" // 把结构化 Event 编码成一行 JSON。
-	"errors"        // 判断 .env 不存在这一种可忽略情况。
+	"errors"        // 合并多处延迟关闭的报错。
 	"flag"          // 使用标准库解析 --workspace 和 --max-steps 参数。
 	"fmt"           // 输出最终答案和错误信息。
 	"io"            // 让极简进度渲染函数可以写入任意输出目标。
 	"os"            // 访问命令行标准输出、标准错误和退出码。
 	"os/signal"     // 把 Ctrl+C 转换为 Context 取消信号。
 	"path/filepath" // 生成事件日志的默认路径并创建父目录。
-	"runtime"       // 区分 Windows ACL 与 Unix 权限位的检查方式。
 	"strings"       // 把多个位置参数重新拼成完整用户提示。
 	"sync"
 	"time" // 表示整次运行的超时时间。
@@ -57,17 +56,23 @@ func runCLI(args []string) (runErr error) {
 			isolated = false
 		}
 	}
-	// 每次启动都从当前项目根目录读取 .env；文件不存在时仍允许使用离线 Demo 模式。
+	// .env 已被统一配置文件取代；检测到旧文件时提示迁移，不再注入进程环境。
 	if !isolated {
-		if err := loadDotEnv(".env"); err != nil {
-			return err
-		}
+		noticeLegacyDotEnv()
 	}
 	// eval 使用独立 FlagSet
 	if len(args) > 0 && args[0] == "eval" {
 		evalContext, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
 		if err := runEval(evalContext, args[1:]); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// 可选的用户级 PATH 安装（不装也始终可以 bin/xcode.exe 直接启动）。
+	if len(args) > 0 && args[0] == "install" {
+		if err := runInstall(args[1:]); err != nil {
 			return err
 		}
 		return nil
@@ -129,7 +134,7 @@ func runCLI(args []string) (runErr error) {
 	}
 
 	flags := flag.NewFlagSet("xcode", flag.ContinueOnError)
-	flags.BoolVar(&isolated, "isolated", isolated, "ignore .env and user/project config; use flags and process environment")
+	flags.BoolVar(&isolated, "isolated", isolated, "ignore user/project config files; use flags and process environment")
 	// 定义可选命令行参数；返回的是指针，调用 flag.Parse 后再解引用读取值。
 	// 默认值来自配置文件（flag 显式传入时覆盖配置）。
 	workspace := flags.String("workspace", presetWorkspace, "workspace root")
@@ -157,8 +162,6 @@ func runCLI(args []string) (runErr error) {
 	resultFile := flags.String("result-file", "", "write a JSON run result on completion or failure; not a correctness grade")
 	promptFile := flags.String("prompt-file", "", "read the task from a UTF-8 file instead of positional arguments")
 	providerRetries := flags.Int("provider-retries", 2, "additional provider HTTP attempts (0 disables retries)")
-	modelConfig := flags.String("model-config", "", "external DeepSeek credential/config text file; contents are never copied into reports")
-	modelKeyIndex := flags.Int("model-key-index", 0, "zero-based API key index in model-config")
 	thinking := flags.String("thinking", "enabled", "DeepSeek thinking mode: enabled or disabled")
 	reasoningEffort := flags.String("reasoning-effort", "high", "DeepSeek reasoning effort: low, high or max")
 	maxOutputTokens := flags.Int("max-output-tokens", 0, "DeepSeek per-request output limit (0 = 8192)")
@@ -174,8 +177,17 @@ func runCLI(args []string) (runErr error) {
 			providerExplicit = true
 		}
 	})
-	if *modelConfig != "" && !providerExplicit {
-		*provider = "deepseek"
+	// 首次运行向导与 demo/Key 矛盾检测：仅在交互式终端且 provider 未配置时介入。
+	if !isolated && !*nonInteractive && *resultFile == "" && !providerExplicit {
+		chosen, changed, setupErr := runSetupWizard(appConfig)
+		if setupErr != nil {
+			return setupErr
+		}
+		if changed {
+			*provider = chosen
+			appConfig.Provider = chosen
+			appConfig.ProviderSet = true
+		}
 	}
 	// 位置参数为空时进入交互模式；有参数时为一次性命令。
 	interactive := flags.NArg() == 0 && *promptFile == ""
@@ -198,7 +210,6 @@ func runCLI(args []string) (runErr error) {
 	record.Config.ContextBudget, record.Config.SandboxImage = *contextBudget, *sandboxImage
 	record.Config.Isolated = isolated
 	record.Config.DoomLoopLimit, record.Config.ProviderRetries = *doomLoopLimit, *providerRetries
-	record.Config.ModelKeyIndex = *modelKeyIndex
 	if *resultFile != "" {
 		if _, err := os.Lstat(*resultFile); err == nil {
 			return fmt.Errorf("result-file already exists: %s", *resultFile)
@@ -217,9 +228,6 @@ func runCLI(args []string) (runErr error) {
 	}
 	if *nonInteractive && configErr != nil {
 		return configErr
-	}
-	if *modelConfig != "" && !strings.EqualFold(*provider, "deepseek") {
-		return fmt.Errorf("model-config is supported with provider deepseek")
 	}
 	if *typedShadow && *nonInteractive {
 		return fmt.Errorf("typed-shadow is not yet accounted for by batch run budgets; disable it for non-interactive runs")
@@ -245,18 +253,16 @@ func runCLI(args []string) (runErr error) {
 	}
 	record.BinaryVersion = version
 	if strings.EqualFold(*provider, "bailian") {
-		record.Config.Model = envOrDefault("DASHSCOPE_MODEL", defaultBailianModel)
-		record.Config.Endpoint = safeEndpoint(envOrDefault("DASHSCOPE_BASE_URL", defaultBailianBaseURL))
+		bailianRun := bailianSettings(appConfig, *providerRetries)
+		record.Config.Model = bailianRun.Model
+		record.Config.Endpoint = safeEndpoint(bailianRun.BaseURL)
 	}
 	var deepseekConfig deepseek.Config
 	if strings.EqualFold(*provider, "deepseek") {
 		if *reasoningEffort != "low" && *reasoningEffort != "high" && *reasoningEffort != "max" {
 			return fmt.Errorf("reasoning-effort must be low, high or max")
 		}
-		deepseekConfig, err = deepseekSettings(*modelConfig, *modelKeyIndex, *thinking, *reasoningEffort, *providerRetries, *maxOutputTokens)
-		if err != nil {
-			return err
-		}
+		deepseekConfig = deepseekSettings(appConfig, *thinking, *reasoningEffort, *providerRetries, *maxOutputTokens)
 		record.Config.Model, record.Config.Endpoint = deepseekConfig.Model, safeEndpoint(deepseekConfig.BaseURL)
 		record.Config.Thinking, record.Config.ReasoningEffort = deepseekConfig.Thinking, deepseekConfig.ReasoningEffort
 		record.Config.MaxOutputTokens = deepseekConfig.MaxOutputTokens
@@ -279,12 +285,12 @@ func runCLI(args []string) (runErr error) {
 		return err
 	}
 	record.Config.Workspace = readOnlyTools.WorkspaceRoot()
-	// 根据 --provider 选择模型；百炼密钥只从当前进程环境变量读取。
+	// 根据 --provider 选择模型；密钥与端点来自配置文件（环境变量兜底）。
 	var selectedModel harness.Model
 	if strings.EqualFold(*provider, "deepseek") {
 		selectedModel, err = deepseek.New(deepseekConfig)
 	} else {
-		selectedModel, err = buildModelWithRetryLimit(*provider, *providerRetries)
+		selectedModel, err = buildModelWithRetryLimit(appConfig, *provider, *providerRetries)
 	}
 	if err != nil {
 		return err
@@ -448,16 +454,7 @@ func runCLI(args []string) (runErr error) {
 	manager.SetNoteRecorder(notes)
 	// compaction 策略需要模型摘要器；demo 模型不具备总结能力，保持 nil 即回退占位符。
 	if !strings.EqualFold(*provider, "demo") {
-		selected := summaryModel
-		manager.SetSummarizer(func(ctx context.Context, oldText string) (string, error) {
-			response, err := selected.Generate(ctx, []harness.Message{
-				{Role: "user", Content: "请把下面这段 Agent 工作历史总结成不超过 200 字的要点，保留目标、已改文件、验证结果、失败与下一步：\n" + oldText},
-			}, nil, harness.ModelEventSinkFunc(func(harness.ModelEvent) {}))
-			if err != nil {
-				return "", err
-			}
-			return response.Content, nil
-		})
+		manager.SetSummarizer(chatSummarizer(summaryModel))
 	}
 
 	// 类型化 shadow 分类器（local/jev）——与故障评测路径共用 mountTypedShadow，
@@ -468,7 +465,7 @@ func runCLI(args []string) (runErr error) {
 		if strings.TrimSpace(backend) == "" {
 			backend = "local"
 		}
-		if err := mountTypedShadow(manager, backend, *provider, selectedModel, appConfig.TypedClassifierEndpoint, appConfig.TypedClassifierModel, appConfig.TypedClassifierKeyEnvVar, false); err != nil {
+		if err := mountTypedShadow(manager, appConfig, backend, *provider, selectedModel, appConfig.TypedClassifierEndpoint, appConfig.TypedClassifierModel, false); err != nil {
 			return err
 		}
 	}
@@ -520,6 +517,24 @@ func runCLI(args []string) (runErr error) {
 		session := harness.NewSession(selectedModel, secure, *maxSteps, sink, projectMemo)
 		session.SetTurnLog(turnLog)
 		session.SetContextManager(manager)
+		// /model 热切换：重载配置、重建模型（含预算包装），并同步 delegate 子智能体
+		// （闭包按引用捕获 selectedModel，重新赋值即全链路生效）与压缩摘要器。
+		switchProvider := func(provider string) (string, error) {
+			fresh, loadErr := config.Load(*workspace)
+			if loadErr != nil {
+				return "", loadErr
+			}
+			next, buildErr := buildModelWithRetryLimit(fresh, provider, *providerRetries)
+			if buildErr != nil {
+				return "", buildErr
+			}
+			selectedModel = budget.Wrap(next, "agent")
+			session.SetModel(selectedModel)
+			if !strings.EqualFold(provider, "demo") {
+				manager.SetSummarizer(chatSummarizer(budget.Wrap(next, "summary")))
+			}
+			return displayModelName(fresh, provider), nil
+		}
 		// 尝试恢复上次会话。
 		offerResume(session, readOnlyTools.WorkspaceRoot())
 		// 提示未完成的轮次；交互内恢复留待后续，先用一次性 --resume 完成。
@@ -529,12 +544,13 @@ func runCLI(args []string) (runErr error) {
 		}
 		// 进入 REPL 循环。
 		return runInteractive(ctx, session, replConfig{
-			Provider:  *provider,
-			Model:     envOrDefault("DASHSCOPE_MODEL", "demo"),
-			Mode:      *mode,
-			Workspace: readOnlyTools.WorkspaceRoot(),
-			Timeout:   *timeout,
-			Engine:    engine,
+			Provider:       *provider,
+			Model:          displayModelName(appConfig, *provider),
+			Mode:           *mode,
+			Workspace:      readOnlyTools.WorkspaceRoot(),
+			Timeout:        *timeout,
+			Engine:         engine,
+			SwitchProvider: switchProvider,
 		})
 	}
 
@@ -627,112 +643,68 @@ func compactLine(text string, maxRunes int) string {
 	return string(runes[:maxRunes-1]) + "…"
 }
 
-// buildModel 根据 provider 名称创建模型实现，并校验百炼所需的运行配置。
-func buildModel(provider string) (harness.Model, error) {
-	return buildModelWithRetryLimit(provider, 2)
+// chatSummarizer 返回用指定模型压缩工作历史的摘要函数；启动装配与 /model 热切换共用。
+func chatSummarizer(summarizer harness.Model) func(context.Context, string) (string, error) {
+	return func(ctx context.Context, oldText string) (string, error) {
+		response, err := summarizer.Generate(ctx, []harness.Message{
+			{Role: "user", Content: "请把下面这段 Agent 工作历史总结成不超过 200 字的要点，保留目标、已改文件、验证结果、失败与下一步：\n" + oldText},
+		}, nil, harness.ModelEventSinkFunc(func(harness.ModelEvent) {}))
+		if err != nil {
+			return "", err
+		}
+		return response.Content, nil
+	}
 }
 
-func buildModelWithRetryLimit(provider string, retries int) (harness.Model, error) {
+// buildModel 根据 provider 名称创建模型实现，配置来自配置文件与环境变量取值链。
+func buildModel(cfg config.Config, provider string) (harness.Model, error) {
+	return buildModelWithRetryLimit(cfg, provider, 2)
+}
+
+func buildModelWithRetryLimit(cfg config.Config, provider string, retries int) (harness.Model, error) {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "demo":
 		return model.Demo{}, nil
 	case "bailian":
-		return bailian.New(bailian.Config{
-			APIKey:         strings.TrimSpace(os.Getenv("DASHSCOPE_API_KEY")),
-			BaseURL:        envOrDefault("DASHSCOPE_BASE_URL", defaultBailianBaseURL),
-			Model:          envOrDefault("DASHSCOPE_MODEL", defaultBailianModel),
-			MaxRetries:     retries,
-			DisableRetries: retries == 0,
-		})
+		return bailian.New(bailianSettings(cfg, retries))
 	case "deepseek":
-		settings, err := deepseekSettings("", 0, "enabled", "high", retries, 8192)
-		if err != nil {
-			return nil, err
-		}
-		return deepseek.New(settings)
+		return deepseek.New(deepseekSettings(cfg, "enabled", "high", retries, 8192))
 	default:
 		return nil, fmt.Errorf("unsupported provider %q: choose demo, bailian or deepseek", provider)
 	}
 }
 
-// loadDotEnv 把受支持的 .env 配置加载到当前进程，不修改全局 Shell 或 Git 配置。
-func loadDotEnv(path string) error {
-	file, err := os.Open(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
+// noticeLegacyDotEnv 检测项目根目录的旧版 .env 并提示一次性迁移；只读不注入。
+func noticeLegacyDotEnv() {
+	file, err := os.Open(".env")
 	if err != nil {
-		return fmt.Errorf("open %s: %w", path, err)
+		return
 	}
 	defer file.Close()
-
-	// 密钥文件不能允许同组用户或其他用户读取；0600 是推荐权限。
-	info, err := file.Stat()
-	if err != nil {
-		return fmt.Errorf("inspect %s: %w", path, err)
+	legacyNames := map[string]bool{
+		"DASHSCOPE_API_KEY": true, "DASHSCOPE_BASE_URL": true, "DASHSCOPE_MODEL": true,
+		"DEEPSEEK_API_KEY": true, "DEEPSEEK_BASE_URL": true, "DEEPSEEK_MODEL": true,
+		"TYPESAFE_API_KEY": true, "TYPESAFE_ENDPOINT": true, "TYPESAFE_MODEL": true,
 	}
-	// Windows 的 FileMode.Perm 不表示真实 ACL，不能用 Unix 位判断密钥文件是否安全。
-	// Windows ACL 的精确校验需要平台安全描述符支持，留待后续实现。
-	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
-		return fmt.Errorf("%s permissions are too open: run chmod 600 %s", path, path)
-	}
-
-	// 白名单避免把项目文件中的任意名称都注入进进程环境。
-	allowed := map[string]struct{}{
-		"DEEPSEEK_API_KEY":   {},
-		"DEEPSEEK_BASE_URL":  {},
-		"DEEPSEEK_MODEL":     {},
-		"DASHSCOPE_API_KEY":  {},
-		"DASHSCOPE_BASE_URL": {},
-		"DASHSCOPE_MODEL":    {},
-		// TypeSafe Jev 真接入的密钥与端点配置。
-		"TYPESAFE_API_KEY":  {},
-		"TYPESAFE_ENDPOINT": {},
-		"TYPESAFE_MODEL":    {},
-		// 类型化分类器的独立 Key（配置文件 typed-classifier-api-key-env 指向它）。
-		"XCODE_CLASSIFIER_API_KEY": {},
-	}
-
+	var found []string
 	scanner := bufio.NewScanner(file)
-	for lineNumber := 1; scanner.Scan(); lineNumber++ {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		name, value, ok := strings.Cut(line, "=")
-		name = strings.TrimSpace(name)
-		if !ok || name == "" {
-			return fmt.Errorf("%s:%d: expected NAME=value", path, lineNumber)
-		}
-		if _, ok := allowed[name]; !ok {
-			continue
-		}
-
-		// 只去除包裹整个值的一对引号，不改动值中间的字符。
-		value = strings.TrimSpace(value)
-		if len(value) >= 2 && ((value[0] == '\'' && value[len(value)-1] == '\'') || (value[0] == '"' && value[len(value)-1] == '"')) {
-			value = value[1 : len(value)-1]
-		}
-		if value == "" {
-			return fmt.Errorf("%s:%d: %s must not be empty", path, lineNumber, name)
-		}
-		if err := os.Setenv(name, value); err != nil {
-			return fmt.Errorf("set %s from %s: %w", name, path, err)
+	for scanner.Scan() {
+		name, _, ok := strings.Cut(strings.TrimSpace(scanner.Text()), "=")
+		if ok && legacyNames[strings.TrimSpace(name)] {
+			found = append(found, strings.TrimSpace(name))
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("read %s: %w", path, err)
+	if len(found) == 0 {
+		return
 	}
-	return nil
-}
-
-// envOrDefault 返回非空环境变量；变量缺失时使用安全默认值。
-func envOrDefault(name, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
-		return value
+	globalPath, pathErr := config.GlobalPath()
+	hint := "(无法定位全局配置路径)"
+	if pathErr == nil {
+		hint = globalPath
 	}
-	return fallback
+	fmt.Fprintf(os.Stderr, "[notice] 检测到旧版 .env（%s 等）。该文件已不再生效：请把密钥迁移到\n"+
+		"[notice] %s（如 bailian-api-key=sk-...），或改用环境变量。详见 README。\n",
+		strings.Join(found, ", "), hint)
 }
 
 // check 统一处理 CLI 中不可恢复的错误，避免每次重复打印和退出逻辑。

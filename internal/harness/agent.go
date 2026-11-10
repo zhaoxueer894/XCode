@@ -69,6 +69,9 @@ func (a *Agent) SetProjectMemory(text string) { a.projectMemory = text }
 // 交互模式经 Session 转发挂载，一次性 CLI 直接挂载。
 func (a *Agent) SetTurnLog(log *TurnLog) { a.turnLog = log }
 
+// SetModel 替换主模型；REPL 的 /model 命令在轮次之间调用，下一轮立即生效。
+func (a *Agent) SetModel(model Model) { a.model = model }
+
 // Run 按默认选项执行一次循环，只返回最终答案；需要停止原因等完整结果时使用 RunWithOptions。
 func (a *Agent) Run(ctx context.Context, prompt string) (string, error) {
 	result, err := a.RunWithOptions(ctx, prompt, RunOptions{})

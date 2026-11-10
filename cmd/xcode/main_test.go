@@ -1,108 +1,153 @@
 package main
 
-// 本文件验证 CLI 配置加载与 Provider 选择，不会调用真实百炼服务。
+// 本文件验证 CLI 配置取值链与 Provider 选择，不会调用真实百炼服务。
 
 import (
-	"os"            // 创建测试专用 .env 并检查进程环境变量。
-	"path/filepath" // 拼接临时目录中的配置路径。
-	"runtime"       // Windows 不使用 Unix 权限位表达 ACL。
-	"strings"       // 检查错误信息是否说明具体配置问题。
-	"testing"       // Go 标准测试框架。
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
 
+	"xcode/internal/config"  // 配置结构与 Upsert 写入。
 	"xcode/internal/harness" // 构造用于验证极简进度渲染的事件。
 )
 
-// TestLoadDotEnvLoadsOnlyAllowedValues 验证 .env 只加载白名单配置并支持引号。
-func TestLoadDotEnvLoadsOnlyAllowedValues(t *testing.T) {
-	path := filepath.Join(t.TempDir(), ".env")
-	content := strings.Join([]string{
-		"# test configuration",
-		"DASHSCOPE_API_KEY='test-key'",
-		"DASHSCOPE_BASE_URL=https://example.com/compatible-mode/v1",
-		`DASHSCOPE_MODEL="qwen-test"`,
-		"UNRELATED_VALUE=must-not-be-loaded",
-	}, "\n")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	t.Setenv("DASHSCOPE_API_KEY", "old-key")
-	t.Setenv("DASHSCOPE_BASE_URL", "old-url")
-	t.Setenv("DASHSCOPE_MODEL", "old-model")
-	t.Setenv("UNRELATED_VALUE", "unchanged")
-	if err := loadDotEnv(path); err != nil {
-		t.Fatal(err)
-	}
-
-	if got := os.Getenv("DASHSCOPE_API_KEY"); got != "test-key" {
-		t.Fatalf("API key = %q, want test-key", got)
-	}
-	if got := os.Getenv("DASHSCOPE_BASE_URL"); got != "https://example.com/compatible-mode/v1" {
-		t.Fatalf("base URL = %q", got)
-	}
-	if got := os.Getenv("DASHSCOPE_MODEL"); got != "qwen-test" {
-		t.Fatalf("model = %q, want qwen-test", got)
-	}
-	if got := os.Getenv("UNRELATED_VALUE"); got != "unchanged" {
-		t.Fatalf("unrelated environment value changed to %q", got)
-	}
-}
-
-// TestLoadDotEnvAllowsMissingFile 验证没有 .env 时仍可使用离线 Demo 模式。
-func TestLoadDotEnvAllowsMissingFile(t *testing.T) {
-	if err := loadDotEnv(filepath.Join(t.TempDir(), "missing.env")); err != nil {
-		t.Fatalf("missing .env returned error: %v", err)
-	}
-}
-
-// TestLoadDotEnvRejectsOpenPermissions 验证可能泄露密钥的宽松文件权限会被拒绝。
-func TestLoadDotEnvRejectsOpenPermissions(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows permissions are represented by ACLs instead of Unix mode bits")
-	}
-	path := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(path, []byte("DASHSCOPE_API_KEY=test-key\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(path, 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	err := loadDotEnv(path)
-	if err == nil || !strings.Contains(err.Error(), "chmod 600") {
-		t.Fatalf("error = %v, want chmod 600 guidance", err)
-	}
-}
-
-// TestLoadDotEnvRejectsMalformedAllowedValue 验证空密钥不会悄悄覆盖有效配置。
-func TestLoadDotEnvRejectsMalformedAllowedValue(t *testing.T) {
-	path := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(path, []byte("DASHSCOPE_API_KEY=\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	err := loadDotEnv(path)
-	if err == nil || !strings.Contains(err.Error(), "must not be empty") {
-		t.Fatalf("error = %v, want empty-value error", err)
-	}
-}
-
 // TestBuildModelSelectsSupportedProvider 验证 CLI 可选择 Demo 和配置完整的百炼 Provider。
 func TestBuildModelSelectsSupportedProvider(t *testing.T) {
-	if _, err := buildModel("demo"); err != nil {
+	if _, err := buildModel(config.Config{}, "demo"); err != nil {
 		t.Fatalf("build demo model: %v", err)
 	}
 
 	t.Setenv("DASHSCOPE_API_KEY", "test-key")
 	t.Setenv("DASHSCOPE_BASE_URL", "https://example.com/compatible-mode/v1")
 	t.Setenv("DASHSCOPE_MODEL", "qwen-test")
-	if _, err := buildModel("bailian"); err != nil {
+	if _, err := buildModel(config.Config{}, "bailian"); err != nil {
 		t.Fatalf("build bailian model: %v", err)
 	}
 
-	if _, err := buildModel("unknown"); err == nil {
+	if _, err := buildModel(config.Config{}, "unknown"); err == nil {
 		t.Fatal("unknown provider was accepted")
 	}
+}
+
+// TestBailianSettingsResolutionChain 验证取值链：配置文件键 > 环境变量 > 内置默认。
+func TestBailianSettingsResolutionChain(t *testing.T) {
+	t.Setenv("DASHSCOPE_API_KEY", "env-key")
+	t.Setenv("DASHSCOPE_BASE_URL", "https://env.example/v1")
+	t.Setenv("DASHSCOPE_MODEL", "env-model")
+
+	fromEnv := bailianSettings(config.Config{}, 2)
+	if fromEnv.APIKey != "env-key" || fromEnv.BaseURL != "https://env.example/v1" || fromEnv.Model != "env-model" {
+		t.Fatalf("env fallback settings = %+v", fromEnv)
+	}
+
+	fromConfig := bailianSettings(config.Config{
+		BailianAPIKey: "cfg-key", BailianBaseURL: "https://cfg.example/v1", BailianModel: "cfg-model",
+	}, 2)
+	if fromConfig.APIKey != "cfg-key" || fromConfig.BaseURL != "https://cfg.example/v1" || fromConfig.Model != "cfg-model" {
+		t.Fatalf("config override settings = %+v", fromConfig)
+	}
+
+	t.Setenv("DASHSCOPE_API_KEY", "")
+	t.Setenv("DASHSCOPE_BASE_URL", "")
+	t.Setenv("DASHSCOPE_MODEL", "")
+	defaults := bailianSettings(config.Config{}, 2)
+	if defaults.APIKey != "" || defaults.BaseURL != defaultBailianBaseURL || defaults.Model != defaultBailianModel {
+		t.Fatalf("default settings = %+v", defaults)
+	}
+}
+
+// TestDeepseekSettingsDefaults 验证 DeepSeek 端点、模型与输出上限的内置默认值。
+func TestDeepseekSettingsDefaults(t *testing.T) {
+	t.Setenv("DEEPSEEK_API_KEY", "")
+	t.Setenv("DEEPSEEK_BASE_URL", "")
+	t.Setenv("DEEPSEEK_MODEL", "")
+	settings := deepseekSettings(config.Config{}, "enabled", "high", 2, 0)
+	if settings.APIKey != "" || settings.BaseURL != defaultDeepseekBaseURL || settings.Model != defaultDeepseekModel {
+		t.Fatalf("deepseek defaults = %+v", settings)
+	}
+	if settings.MaxOutputTokens != 8192 {
+		t.Fatalf("max output tokens = %d, want 8192", settings.MaxOutputTokens)
+	}
+}
+
+// TestDetectConfiguredRealProvider 验证矛盾检测的供应商发现顺序。
+func TestDetectConfiguredRealProvider(t *testing.T) {
+	t.Setenv("DASHSCOPE_API_KEY", "")
+	t.Setenv("DEEPSEEK_API_KEY", "")
+	if got := detectConfiguredRealProvider(config.Config{}); got != "" {
+		t.Fatalf("detected = %q, want empty", got)
+	}
+	if got := detectConfiguredRealProvider(config.Config{DeepseekAPIKey: "sk-x"}); got != "deepseek" {
+		t.Fatalf("detected = %q, want deepseek", got)
+	}
+	t.Setenv("DASHSCOPE_API_KEY", "env-key")
+	if got := detectConfiguredRealProvider(config.Config{DeepseekAPIKey: "sk-x"}); got != "bailian" {
+		t.Fatalf("detected = %q, want bailian priority", got)
+	}
+}
+
+// TestParseWizardChoice 验证向导菜单输入解析。
+func TestParseWizardChoice(t *testing.T) {
+	cases := []struct {
+		input  string
+		want   string
+		wantOK bool
+	}{
+		{"1", "bailian", true},
+		{" 2 ", "deepseek", true},
+		{"3", "demo", true},
+		{"deepseek", "deepseek", true},
+		{"DEMO", "demo", true},
+		{"0", "", false},
+		{"4", "", false},
+		{"x", "", false},
+		{"", "", false},
+	}
+	for _, testCase := range cases {
+		got, ok := parseWizardChoice(testCase.input)
+		if ok != testCase.wantOK || got != testCase.want {
+			t.Errorf("parseWizardChoice(%q) = (%q, %v), want (%q, %v)",
+				testCase.input, got, ok, testCase.want, testCase.wantOK)
+		}
+	}
+}
+
+// TestConfigUpsertReplacesAndAppends 验证向导写入：原位替换、保留注释、追加新键。
+func TestConfigUpsertReplacesAndAppends(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "config")
+	if err := config.Upsert(path, "provider", "bailian"); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.Upsert(path, "provider", "deepseek"); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.Upsert(path, "bailian-api-key", "sk-new"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+	wantLines := []string{"provider=deepseek", "bailian-api-key=sk-new"}
+	for _, line := range wantLines {
+		if !strings.Contains(got, line+"\n") {
+			t.Errorf("config missing %q; got:\n%s", line, got)
+		}
+	}
+	if strings.Contains(got, "provider=bailian") {
+		t.Errorf("stale provider line kept:\n%s", got)
+	}
+}
+
+// TestNoticeLegacyDotEnv 验证旧 .env 检测只认已知变量名。
+func TestNoticeLegacyDotEnv(t *testing.T) {
+	t.Chdir(t.TempDir())
+	_ = os.WriteFile(".env", []byte("UNRELATED=1\n"), 0o600)
+	noticeLegacyDotEnv() // 不应 panic；无关变量不触发提示（输出无法捕获，仅冒烟）。
+	_ = os.WriteFile(".env", []byte("DASHSCOPE_API_KEY=sk-old\n"), 0o600)
+	noticeLegacyDotEnv()
 }
 
 // TestWriteCompactEventRendersKeyKinds 验证极简进度只渲染关键事件并压缩内容。
@@ -169,10 +214,10 @@ func TestCompactLineCollapsesAndTruncates(t *testing.T) {
 func TestBuildModelRequiresBailianKey(t *testing.T) {
 	t.Setenv("DASHSCOPE_API_KEY", "")
 	errText := ""
-	if _, err := buildModel("bailian"); err != nil {
+	if _, err := buildModel(config.Config{}, "bailian"); err != nil {
 		errText = err.Error()
 	}
-	if !strings.Contains(errText, "DASHSCOPE_API_KEY") {
+	if !strings.Contains(errText, "bailian-api-key") || !strings.Contains(errText, "DASHSCOPE_API_KEY") {
 		t.Fatalf("error = %q, want missing-key guidance", errText)
 	}
 }

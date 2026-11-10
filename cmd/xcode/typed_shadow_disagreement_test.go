@@ -6,10 +6,11 @@ package main
 
 import (
 	"context" // 分类调用。
-	"os"      // 门控开关与 Key。
+	"os"      // 门控开关。
 	"strings" // 内容截断。
 	"testing" // Go 标准测试框架。
 
+	"xcode/internal/config"        // 配置取值链。
 	"xcode/internal/contextmgr"    // RuleDecider 与决策类型。
 	"xcode/internal/model/bailian" // qwen 聊天分类器。
 	"xcode/internal/model/jev"     // Jev systemone 客户端。
@@ -25,7 +26,9 @@ func TestClassifierDisagreementSamples(t *testing.T) {
 
 	ruleDecisions := contextmgr.RuleDecider{}.Decide(units)
 
-	jevClient, err := jev.New(os.Getenv("TYPESAFE_API_KEY"), os.Getenv("TYPESAFE_ENDPOINT"), os.Getenv("TYPESAFE_MODEL"))
+	disagreementConfig, _ := config.Load("../..")
+	jevKey, jevEndpoint, jevModel := typesafeSettings(disagreementConfig)
+	jevClient, err := jev.New(jevKey, jevEndpoint, jevModel)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,8 +37,8 @@ func TestClassifierDisagreementSamples(t *testing.T) {
 		t.Fatalf("jev classify: %v", err)
 	}
 	qwenModel, err := bailian.New(bailian.Config{
-		APIKey:  os.Getenv("DASHSCOPE_API_KEY"),
-		BaseURL: os.Getenv("DASHSCOPE_BASE_URL"),
+		APIKey:  classifierKey(disagreementConfig),
+		BaseURL: pick(disagreementConfig.BailianBaseURL, os.Getenv("DASHSCOPE_BASE_URL")),
 		Model:   "qwen-plus",
 	})
 	if err != nil {
