@@ -1,3 +1,0 @@
-typed-classifier=local
-typed-classifier-endpoint=https://dashscope.aliyuncs.com/compatible-mode/v1
-typed-classifier-model=qwen-plus

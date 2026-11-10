@@ -9,3 +9,6 @@ bin/
 .eval/
 __pycache__/
 *.pyc
+
+# 项目级配置含密钥,永不入库;模板见 .xcode/config.example
+.xcode/config

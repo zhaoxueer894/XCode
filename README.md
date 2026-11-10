@@ -31,6 +31,7 @@ XCode 是一个用 Go 写的多智能体编码工具。你给它一个任务（�
 
 ```bash
 go build -o bin/xcode.exe ./cmd/xcode
+cp .xcode/config.example .xcode/config    # 复制模板并填入你的模型密钥（该文件不入库）
 bin/xcode.exe               # 交互模式（REPL 多轮对话）
 bin/xcode.exe "修个 bug"     # 一次性任务
 ```
