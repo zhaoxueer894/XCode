@@ -3,8 +3,6 @@
 Run outside the agent as part of the evaluation runner. Output is a candidate
 patch, never a correctness verdict. Regrade it in a clean verifier environment.
 """
-from __future__ import annotations
-
 import argparse
 import os
 import re
@@ -13,7 +11,7 @@ import subprocess
 import tempfile
 
 
-def capture_patch(workspace: Path, base_commit: str, output: Path) -> None:
+def capture_patch(workspace, base_commit, output):
     workspace = workspace.resolve(strict=True)
     if not re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", base_commit):
         raise ValueError("base_commit must be the pinned full commit hash")
@@ -23,7 +21,7 @@ def capture_patch(workspace: Path, base_commit: str, output: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="xcode-patch-") as directory:
         env = dict(os.environ, GIT_INDEX_FILE=str(Path(directory) / "index"), GIT_LITERAL_PATHSPECS="1")
 
-        def git(*args: str, input: bytes | None = None) -> bytes:
+        def git(*args, input=None):
             result = subprocess.run(
                 ["git", "-C", str(workspace), *args], env=env,
                 input=input,
@@ -49,7 +47,7 @@ def capture_patch(workspace: Path, base_commit: str, output: Path) -> None:
     output.write_bytes(patch)
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument("--base-commit", required=True)
