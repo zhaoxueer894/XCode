@@ -399,6 +399,7 @@ func (c *Client) consumeSSE(
 	}
 	sort.Ints(indices)
 	completedCalls := make([]harness.ToolCall, 0, len(indices))
+	skippedIndex := -1
 	for _, index := range indices {
 		accumulator := toolCalls[index]
 		if accumulator.id == "" || accumulator.name == "" {
@@ -409,13 +410,22 @@ func (c *Client) consumeSSE(
 			arguments = "{}"
 		}
 		if !json.Valid([]byte(arguments)) {
-			return harness.ModelResponse{}, fmt.Errorf("invalid tool arguments JSON at index %d", index)
+			// Provider 流式拼接可能产出非法参数 JSON。丢弃该调用而不是让整个请求
+			// 失败：模型看不到这条调用的结果，会在后续请求中自行重试——与探索门禁
+			// 的响应级剪除是同一语义。仅当全部调用被丢弃且无正文时才视为失败。
+			if skippedIndex < 0 {
+				skippedIndex = index
+			}
+			continue
 		}
 		completedCalls = append(completedCalls, harness.ToolCall{
 			ID:        accumulator.id,
 			Name:      accumulator.name,
 			Arguments: json.RawMessage(arguments),
 		})
+	}
+	if len(completedCalls) == 0 && content.Len() == 0 && skippedIndex >= 0 {
+		return harness.ModelResponse{}, fmt.Errorf("invalid tool arguments JSON at index %d", skippedIndex)
 	}
 
 	return harness.ModelResponse{

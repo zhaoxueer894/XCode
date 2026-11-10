@@ -238,6 +238,23 @@ func TestGenerateRejectsInvalidToolCall(t *testing.T) {
 	}
 }
 
+// TestGenerateDropsMalformedCallAndKeepsValidOnes 验证一条非法参数的工具调用
+// 只丢弃自身，不让整个请求失败——真实评测中一次流式拼接错误曾杀死整轮运行。
+func TestGenerateDropsMalformedCallAndKeepsValidOnes(t *testing.T) {
+	transport := staticSSETransport(
+		`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call-ok","function":{"name":"read_file","arguments":"{\"path\":\"a.go\"}"}},{"index":1,"id":"call-bad","function":{"name":"read_file","arguments":"{broken"}}]},"finish_reason":"tool_calls"}]}`,
+	)
+	client := newTestClient(t, transport, 1)
+
+	response, err := client.Generate(context.Background(), nil, nil, nil)
+	if err != nil {
+		t.Fatalf("malformed call must not fail the request: %v", err)
+	}
+	if len(response.ToolCalls) != 1 || response.ToolCalls[0].ID != "call-ok" {
+		t.Fatalf("tool calls = %+v, want only call-ok", response.ToolCalls)
+	}
+}
+
 // TestGenerateReturnsStreamError 验证 HTTP 200 流中的 Provider 错误也会结构化返回。
 func TestGenerateReturnsStreamError(t *testing.T) {
 	transport := staticSSETransport(
