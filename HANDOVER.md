@@ -1,4 +1,4 @@
-# XCode 交接文档(2026-11-10)
+# XCode 交接文档(2026-11-11 更新)
 
 写给接下来接手的同学。读完这一份就能知道项目做到哪了、下一步做什么、红线是什么。
 
@@ -10,7 +10,7 @@ XCode 是 COMP5584 课程小组项目:用 Go 写的多智能体编码 CLI。给�
 
 ## 二、当前状态
 
-### 代码(main 分支,已推送,最新提交 41d4d04)
+### 代码(main 分支,已推送,最新提交 0b72706,工作区干净)
 
 核心功能全部已实现并有测试覆盖:
 
@@ -19,14 +19,12 @@ XCode 是 COMP5584 课程小组项目:用 Go 写的多智能体编码 CLI。给�
 - **run 级进度账本**:主智能体与全部子智能体共用一本"是否有人改过生产代码"的账,探索门禁和运行时提示据此判定,晚期出生的子智能体不会被空白账本误伤。
 - 其余:中断恢复(`--resume`)、上下文压缩(bounded 等策略)、快照回滚、eval 回归、故障注入评测。详见 [README.md](README.md)。
 
-### 工作区有 8 个文件未提交(2026-11-10 晚的状态)
+### 此后的增量(接手前必读)
 
-内容分两类:
-
-1. **注释翻译**:6 个文件的中文注释翻成了英文(config.example、provider_settings、run_record、run_options、runtime_progress、types 等),无功能变化。
-2. **唯一的功能改动:`jev` 开关**:`internal/config/config.go` 新增 `jev` 配置键,`cmd/xcode/main.go` 里 `jev=on` 强制用 TypeSafe systemone 分类器、`jev=off` 回退本地聊天模型(原先只有 `typed-classifier` 键,现在 jev 键优先)。`.xcode/config.example` 重写为英文并补了 jev 配置段。
-
-**已验证:`go build` / `go vet` / `go test ./...` 全部通过。** 接手后可以直接提交(建议先跑一遍 `go test -race ./...`);提交前记得交叉编译验证 linux/darwin(教训:曾因平台相关代码没在 linux 编过而返工)。
+- **模型集配置**:`.xcode/config` 改为槽位制——顶部 `developer=` / `reviewer=` 两个选择器,下方 `model.<名字>.key/base-url/id` 可扩充任意多个模型;jev 栏目完整(`jev=on|off` + `typesafe-*` 三键,off 时分类用开发者模型)。旧键兼容。
+- **工作区指纹修复(消融 B/C 格的生死线)**:指纹现在遵循 .gitignore、大文件按"总大小+前 8MiB 哈希"、符号链接按链接文本、其他特殊文件按元数据——修复前指纹在真实仓库(node_modules/大文件)会 11 分钟扫不完或直接报错,门禁全灭。带回归测试。
+- `jev` 开关与注释英文化已提交;single-review 已端到端真实验证(GLM reviewer 自主调工具核查、门禁 19 秒放行)。
+- 运行教训:**改完代码必须 `go build -o bin/xcode.exe ./cmd/xcode` 重建再冒烟**(三次踩旧二进制的坑);真实模型在仓库工作区里跑 `go build` 会在根目录产出 `xcode.exe`(已 gitignore,别再 `git add -A` 扫进去);后台跑 harbor 用 setsid 并保持启动会话存活数秒。
 
 ### 评测进展(4 轮已完成)
 
@@ -38,7 +36,7 @@ XCode 是 COMP5584 课程小组项目:用 Go 写的多智能体编码 CLI。给�
 
 ### 1. 消融实验(最优先,数据是 slides 的命根子)
 
-A/B/C 三格,同一批 round 3 冻结题(10 道)、同预算(每题 20 万 token)、同二进制(`bin/xcode-linux-amd64`,sha256 前缀 `c0f80257`),只有协作拓扑不同:
+A/B/C 三格,同一批 round 3 冻结题(10 道)、同预算(每题 20 万 token)、同一个**开跑前从当前 main 重建**的 `bin/xcode-linux-amd64`(driver 会把当次 sha 快照进每格;切勿用指纹修复之前的旧二进制,B/C 格会被指纹 bug 卡死),只有协作拓扑不同:
 
 | 格 | 模式 | 审查 |
 |---|---|---|
@@ -48,7 +46,7 @@ A/B/C 三格,同一批 round 3 冻结题(10 道)、同预算(每题 20 万 token
 
 **前置条件(缺一不可):**
 
-- **GLM 充值**:智谱 open.bigmodel.cn 账户余额不足(API 返回 1113 错误)。B/C 两格的跨模型审查依赖 GLM。driver 开头的 preflight 会做一次最小调用,余额不够直接终止——这是刻意设计,避免 B/C 全程降级污染数据。**充值前不要跑。**
+- ~~GLM 充值~~ **已解决**:2026-11-11 换了新 key(在 `.xcode/config` 的 `model.glm.key`),实测有余额、真实调用成功。driver 的 preflight 仍会在开跑时再做一次最小调用复核,失败即终止——这是刻意设计,避免 B/C 全程降级污染数据。
 - 用户明确批准后才跑(driver 文件头就是这么写的)。
 
 **怎么跑:**
@@ -74,7 +72,7 @@ driver 会自动:preflight 验 GLM 余额 → `evals/prepare_ablation.py` 生成
 
 ### 4. 收尾杂项
 
-- 提交工作区那 8 个文件的改动(见上)。
+- ~~提交工作区 8 个文件~~ 已完成。
 - 可选研究方向(时间富余才做):让委派在"开放"模式下也真实发生——任务提示词引导。pipeline 模式已从机制上解决,消融 C 格就是在验证它。
 
 ## 四、速查表
@@ -89,13 +87,13 @@ go test ./... && go test -race ./...
 
 # 跑一个任务
 bin/xcode.exe --workspace D:/path/to/repo "修复 bug 并跑通 go test"
-# 流水线模式 + 跨模型审查(配置文件里 reviewer-provider=glm)
+# 流水线模式 + 跨模型审查(配置:reviewer=glm 指向 model.glm.* 槽位)
 bin/xcode.exe --orchestrate pipeline "任务描述"
 ```
 
 | 东西 | 位置 |
 |---|---|
-| 模型密钥配置 | `.xcode/config`(gitignore,不入库;模板 `.xcode/config.example`) |
+| 模型密钥配置 | `.xcode/config`(gitignore,不入库;槽位制,模板 `.xcode/config.example`) |
 | 评测证据 | `.eval/<轮次>/`,如 `.eval/unseen-r3/`、`.eval/ablation/`(消融跑完后) |
 | 冻结题清单 | `evals/unseen-r3.json` 等 |
 | 评测轮报告 | `evals/*_REPORT.md` |
