@@ -30,6 +30,18 @@ case "$PREFLIGHT" in
   *1113*|*error*) echo "FATAL: GLM balance insufficient or error — top up before the ablation"; exit 1;;
 esac
 
+step "binary freshness check"
+# WSL has no Go toolchain: the binary MUST be rebuilt on the Windows side
+# (Git Bash) before this driver starts. Refuse to run a stale binary —
+# older builds predate the fingerprint fix and deadlock gates in B/C.
+BIN_TIME=$(stat -c %Y bin/xcode-linux-amd64 2>/dev/null || echo 0)
+HEAD_TIME=$(git log -1 --format=%ct)
+if [ "$BIN_TIME" -lt "$HEAD_TIME" ]; then
+  echo "FATAL: bin/xcode-linux-amd64 is older than HEAD. Rebuild on the Windows side first:"
+  echo "  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o bin/xcode-linux-amd64 ./cmd/xcode"
+  exit 1
+fi
+
 step "prepare cells"
 $PY evals/prepare_ablation.py
 

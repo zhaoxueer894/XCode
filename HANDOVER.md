@@ -49,14 +49,23 @@ A/B/C 三格,同一批 round 3 冻结题(10 道)、同预算(每题 20 万 token
 - ~~GLM 充值~~ **已解决**:2026-11-11 换了新 key(在 `.xcode/config` 的 `model.glm.key`),实测有余额、真实调用成功。driver 的 preflight 仍会在开跑时再做一次最小调用复核,失败即终止——这是刻意设计,避免 B/C 全程降级污染数据。
 - 用户明确批准后才跑(driver 文件头就是这么写的)。
 
-**怎么跑:**
+**怎么跑(两步,顺序不能反):**
 
 ```bash
-# WSL 里,从仓库根目录
-sh evals/drive_ablation.sh
+# 第 1 步,Windows 侧(Git Bash,仓库根目录):重建 Linux 二进制
+#    WSL 里没有 Go,编不了;driver 会校验二进制比 HEAD 新,旧了直接拒跑
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o bin/xcode-linux-amd64 ./cmd/xcode
+
+# 第 2 步,WSL 里(仓库根目录),detached 启动(直接后台跑会被 WSL 会话回收杀掉):
+setsid sh evals/drive_ablation.sh > .eval/ablation-driver.log 2>&1 < /dev/null &
+sleep 30 && tail -5 .eval/ablation-driver.log   # 确认 preflight 过了再离开
 ```
 
-driver 会自动:preflight 验 GLM 余额 → `evals/prepare_ablation.py` 生成三格目录 → 逐格跑 harbor(每题 2 次试跑),每格落盘 manifest、console.log、git rev、二进制快照。注意 driver 里路径写死为 `/mnt/d/Projects/XCode`,代理写死为网关 IP 的 7897 端口,换机器要改。
+driver 自动:二进制新鲜度校验 → GLM 余额 preflight → 生成三格目录 → 逐格跑 harbor(2 路并发)。**全程约 6-7 小时**(每格 ~2h),中途别杀;隔 10-15 分钟 tail 一次日志看进度即可。
+
+每格跑完的验收:`.eval/ablation/<cell>/harbor/xcode-v1/` 下应有 **10 个** trial 目录(各含 result.json、agent/events.jsonl、model.patch、verifier 判分),console.log 末尾有该格 exit 码。三格全跑完才算消融结束,进入分析(见下一节)。
+
+注意 driver 里路径写死为 `/mnt/d/Projects/XCode`,代理写死为网关 IP 的 7897 端口,换机器要改。
 
 **铁律:不重跑、不删除、失败留盘。** 失败的格子照样留在 `.eval/ablation/` 里,分析时归类为基础设施失败。绝对不允许挑着重跑"好看"的结果——这是课程项目,数据必须真实。另外 `prepare_ablation.py` 拒绝覆盖已存在的格子目录,所以只有在**还没跑过任何东西**的前提下才允许手动删掉重来。
 
