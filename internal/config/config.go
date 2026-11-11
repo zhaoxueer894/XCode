@@ -41,6 +41,11 @@ type Config struct {
 	TypesafeAPIKey   string // typesafe-api-key：jev 分类后端（TypeSafe systemone）密钥。
 	TypesafeEndpoint string // typesafe-endpoint：jev 分类服务端点。
 	TypesafeModel    string // typesafe-model：jev 分类模型名。
+	// 模型集与选择器:model.<name>.key/base-url/id 定义任意多个模型槽,
+	// developer= / reviewer= 从中指定当前使用的两个。旧的逐供应商键仍兼容。
+	Developer  string            // developer: active developer slot name
+	Reviewer   string            // reviewer: active reviewer slot name
+	ModelSlots map[string]ModelSlot // model.<name>.* parsed slots
 	GlmAPIKey        string // glm-api-key
 	GlmBaseURL       string // glm-base-url (default https://open.bigmodel.cn/api/paas/v4)
 	GlmModel         string // glm-model (default glm-4.6)
@@ -54,6 +59,13 @@ type Config struct {
 	TypedClassifierAPIKey  string // typed-classifier-api-key: dedicated classifier credential.
 	TypedClassifierEndpoint string // 保存 local 分类器的 OpenAI 兼容端点；空值表示复用主模型。
 	TypedClassifierModel    string // 保存 local 分类器的模型名；空值表示复用主模型。
+}
+
+// ModelSlot holds one user-defined model endpoint in the config.
+type ModelSlot struct {
+	APIKey  string
+	BaseURL string
+	Model   string
 }
 
 // Defaults 返回内置默认值，作为最低优先级。
@@ -113,12 +125,44 @@ func mergeFile(cfg *Config, path string) error {
 		if !ok {
 			return fmt.Errorf("%s:%d: expected key=value", path, lineNumber)
 		}
+		if err := applySlotValue(cfg, strings.TrimSpace(key), strings.TrimSpace(value)); err != nil {
+			return fmt.Errorf("%s:%d: %w", path, lineNumber, err)
+		}
 		applyValue(cfg, strings.TrimSpace(key), strings.TrimSpace(value))
 	}
 	return scanner.Err()
 }
 
 // applyValue 把一个键值对写入配置结构；未知键静默忽略（向后兼容）。
+// applySlotValue parses model.<name>.key|base-url|id into cfg.ModelSlots.
+// Unknown fields are errors: silent typos would strand a half-configured slot.
+func applySlotValue(cfg *Config, key, value string) error {
+	if !strings.HasPrefix(key, "model.") {
+		return nil
+	}
+	rest := strings.TrimPrefix(key, "model.")
+	name, field, ok := strings.Cut(rest, ".")
+	if !ok || name == "" {
+		return fmt.Errorf("expected model.<name>.<key|base-url|id>, got %q", key)
+	}
+	if cfg.ModelSlots == nil {
+		cfg.ModelSlots = map[string]ModelSlot{}
+	}
+	slot := cfg.ModelSlots[name]
+	switch field {
+	case "key":
+		slot.APIKey = value
+	case "base-url":
+		slot.BaseURL = value
+	case "id":
+		slot.Model = value
+	default:
+		return fmt.Errorf("unknown model field %q (want key, base-url or id)", field)
+	}
+	cfg.ModelSlots[name] = slot
+	return nil
+}
+
 func applyValue(cfg *Config, key, value string) {
 	switch strings.ToLower(key) {
 	case "provider":
@@ -180,6 +224,10 @@ func applyValue(cfg *Config, key, value string) {
 		cfg.Orchestrate = value
 	case "jev":
 		cfg.Jev = value
+	case "developer":
+		cfg.Developer = value
+	case "reviewer":
+		cfg.Reviewer = value
 	case "typed-classifier":
 		cfg.TypedClassifierBackend = value
 	case "typed-classifier-api-key":

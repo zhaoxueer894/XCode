@@ -2,39 +2,36 @@
 # and fill in your keys. .xcode/config is gitignored and never enters git.
 # Priority: CLI flags > project .xcode/config > global ~/.xcode/config > env > defaults.
 
-# ---- Developer model (fill one provider) ----
-provider=deepseek
-deepseek-api-key=sk-...
-# deepseek-base-url=https://api.deepseek.com
-# deepseek-model=deepseek-flash
+# ---- Active models (pick slot names from the model set below) ----
+developer=deepseek
+reviewer=glm
 
-# provider=bailian
-# bailian-api-key=sk-...
-# bailian-model=qwen-plus
+# ---- Model set: define as many slots as you need ----
+model.deepseek.key=sk-...
+model.deepseek.base-url=https://api.deepseek.com
+model.deepseek.id=deepseek-flash
 
-# provider=glm
-# glm-api-key=...
-# glm-model=glm-4.6
+model.glm.key=...
+model.glm.base-url=https://open.bigmodel.cn/api/paas/v4
+model.glm.id=glm-4.6
 
-# ---- Cross-model reviewer (optional) ----
-# Independent reviewer for the completion gate (blind spots differ from the
-# developer model). Unset or failing reviewers fall back to the developer
-# model with a warning; never silent.
-# reviewer-provider=glm
-# reviewer-model=glm-4.6
+# model.bailian.key=sk-...
+# model.bailian.base-url=https://dashscope.aliyuncs.com/compatible-mode/v1
+# model.bailian.id=qwen-plus
+
+# Any OpenAI-compatible endpoint works as its own slot:
+# model.myagent.key=...
+# model.myagent.base-url=https://api.example.com/v1
+# model.myagent.id=some-model
 
 # ---- Orchestration (optional) ----
 # empty = full-tool agent; single | single-review | pipeline (see README)
 # orchestrate=
 
-# ---- Compression classifier (optional; active only with --typed-shadow) ----
-# jev=on  : TypeSafe systemone service (needs the typesafe-* keys).
-# jev=off : a chat model. Defaults to the developer model; set the three
-#           typed-classifier-* keys to use a dedicated model instead.
+# ---- Compression classifier (optional; only with --typed-shadow) ----
+# jev=on  : TypeSafe systemone service (needs the typesafe-* keys below)
+# jev=off : the developer model classifies. Default off.
 # jev=off
-# typed-classifier-api-key=sk-...
-# typed-classifier-endpoint=https://dashscope.aliyuncs.com/compatible-mode/v1
-# typed-classifier-model=qwen-plus
 # typesafe-api-key=...
 # typesafe-endpoint=...
 # typesafe-model=...

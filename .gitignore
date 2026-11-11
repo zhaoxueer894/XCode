@@ -12,3 +12,8 @@ __pycache__/
 
 # 项目级配置含密钥,永不入库;模板见 .xcode/config.example
 .xcode/config
+
+# Agents may run go build inside the workspace; ignore their default outputs
+/xcode.exe
+/xcode
+/xcode-linux-amd64

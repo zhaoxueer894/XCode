@@ -80,6 +80,13 @@ func runSetupWizard(appConfig config.Config) (string, bool, error) {
 	if appConfig.ProviderSet {
 		return appConfig.Provider, false, nil
 	}
+	// A developer slot with a key is a fully configured setup; the legacy
+	// provider= key is not required and the demo notice must not fire.
+	if name := strings.TrimSpace(appConfig.Developer); name != "" {
+		if slot, ok := appConfig.ModelSlots[strings.ToLower(name)]; ok && slot.APIKey != "" {
+			return name, false, nil
+		}
+	}
 	if !stdinIsTerminal() {
 		noticeSetupSkipped(appConfig)
 		return appConfig.Provider, false, nil

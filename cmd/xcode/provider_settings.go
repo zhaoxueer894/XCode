@@ -11,6 +11,7 @@ import (
 
 	"xcode/internal/config"
 	"xcode/internal/harness"
+	"xcode/internal/model/chatcompletions"
 	"xcode/internal/model/bailian"
 	"xcode/internal/model/deepseek"
 	"xcode/internal/model/glm"
@@ -98,6 +99,40 @@ func buildReviewerModel(cfg config.Config, provider, modelOverride string, retri
 		return client, settings.Model, err
 	}
 	return nil, "", fmt.Errorf("reviewer-provider must be glm, deepseek or bailian")
+}
+
+// modelFromSlot builds a model from a config slot. Known slot names reuse
+// their provider wrappers (defaults for thinking etc.); any other name is a
+// generic OpenAI-compatible endpoint.
+func modelFromSlot(name string, slot config.ModelSlot, thinking, effort string, retries, outputTokens int) (harness.Model, string, error) {
+	if strings.TrimSpace(slot.APIKey) == "" {
+		return nil, "", fmt.Errorf("model slot %q has no key: set model.%s.key", name, name)
+	}
+	if outputTokens == 0 {
+		outputTokens = 8192
+	}
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "deepseek":
+		settings := deepseek.Config{APIKey: slot.APIKey, BaseURL: slot.BaseURL, Model: slot.Model,
+			Thinking: thinking, ReasoningEffort: effort, MaxOutputTokens: outputTokens,
+			MaxRetries: retries, DisableRetries: retries == 0}
+		client, err := deepseek.New(settings)
+		return client, settings.Model, err
+	case "bailian":
+		settings := bailian.Config{APIKey: slot.APIKey, BaseURL: slot.BaseURL, Model: slot.Model,
+			MaxRetries: retries, DisableRetries: retries == 0}
+		client, err := bailian.New(settings)
+		return client, settings.Model, err
+	case "glm":
+		settings := glm.Config{APIKey: slot.APIKey, BaseURL: slot.BaseURL, Model: slot.Model,
+			MaxRetries: retries, DisableRetries: retries == 0}
+		client, err := glm.New(settings)
+		return client, settings.Model, err
+	}
+	settings := chatcompletions.Config{Provider: name, APIKey: slot.APIKey, BaseURL: slot.BaseURL,
+		Model: slot.Model, MaxRetries: retries, DisableRetries: retries == 0}
+	client, err := chatcompletions.New(settings)
+	return client, settings.Model, err
 }
 
 // providerKeyConfigured 判断某供应商的 API Key 在配置文件或环境变量中是否可用。

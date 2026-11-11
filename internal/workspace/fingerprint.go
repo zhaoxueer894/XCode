@@ -19,9 +19,9 @@ import (
 const maxFingerprintFileBytes = 8 << 20
 
 // Fingerprint 返回工作区当前内容的稳定指纹（十六进制 SHA-256）。
-// 遍历边界与写前快照一致：只含普通文件，跳过 .git、.xcode-state 等硬性排除路径；
-// Git 忽略但未硬排除的文件参与指纹。出现非普通文件或超限文件时返回错误，
-// 由调用方决定门禁如何降级，绝不静默跳过导致指纹失真。
+// 只含被 Git 跟踪意义上的文件：跳过硬性排除路径与 .gitignore 命中路径——
+// 候选补丁与验收只关心被跟踪文件，忽略目录（node_modules、本地缓存）可能
+// 有数万文件。超大文件按"总大小+头部哈希"入指纹，链接按链接文本入指纹。
 func Fingerprint(root string) (string, error) {
 	view, err := Open(root)
 	if err != nil {
@@ -44,6 +44,17 @@ func Fingerprint(root string) (string, error) {
 			}
 			return nil
 		}
+		// Git 忽略的路径不入指纹：候选补丁与验收只关心被跟踪文件，忽略目录
+		// （node_modules、本地缓存等）可能包含数万文件，整读会让门禁不可用。
+		if view.IsDiscoveryIgnored(path, entry.IsDir()) {
+			if entry.IsDir() && view.CanSkipIgnoredDirectories() {
+				return fs.SkipDir
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			return nil
+		}
 		if entry.IsDir() {
 			return nil
 		}
@@ -51,8 +62,21 @@ func Fingerprint(root string) (string, error) {
 		if err != nil {
 			return fmt.Errorf("inspect %q for fingerprint: %w", path, err)
 		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			// 链接按链接文本入指纹（与写前快照同语义），不读取目标内容。
+			target, linkErr := osRoot.Readlink(path)
+			if linkErr != nil {
+				return fmt.Errorf("readlink %q for fingerprint: %w", path, linkErr)
+			}
+			digest := sha256.Sum256([]byte("link:" + target))
+			lines = append(lines, path+":L"+hex.EncodeToString(digest[:]))
+			return nil
+		}
 		if !info.Mode().IsRegular() {
-			return fmt.Errorf("workspace fingerprint does not support non-regular file %q", path)
+			// 既非普通文件也非符号链接的条目（Windows 重解析点等）：按元数据入指纹。
+			// 条目的出现/消失或大小变化仍会改变指纹；读不到内容时指纹不因此失败。
+			lines = append(lines, fmt.Sprintf("%s:%d:mode%#o", path, info.Size(), info.Mode()))
+			return nil
 		}
 		file, err := osRoot.Open(path)
 		if err != nil {
@@ -60,14 +84,12 @@ func Fingerprint(root string) (string, error) {
 		}
 		defer file.Close()
 		digest := sha256.New()
-		size, err := io.Copy(digest, io.LimitReader(file, maxFingerprintFileBytes+1))
-		if err != nil {
+		// 超大文件按"总大小 + 前 8MiB 内容哈希"入指纹：任何现实的编辑都会改变
+		// 文件大小或头部内容，证据绑定依然成立；对齐 GB 级测试夹具整读纯属浪费。
+		if _, err := io.Copy(digest, io.LimitReader(file, maxFingerprintFileBytes)); err != nil {
 			return fmt.Errorf("read %q for fingerprint: %w", path, err)
 		}
-		if size > maxFingerprintFileBytes {
-			return fmt.Errorf("file %q exceeds fingerprint limit %d bytes", path, maxFingerprintFileBytes)
-		}
-		lines = append(lines, path+":"+hex.EncodeToString(digest.Sum(nil)))
+		lines = append(lines, fmt.Sprintf("%s:%d:%s", path, info.Size(), hex.EncodeToString(digest.Sum(nil))))
 		return nil
 	})
 	if walkErr != nil {

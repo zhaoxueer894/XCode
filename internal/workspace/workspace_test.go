@@ -185,3 +185,65 @@ func TestReadSetObserveDetectsRepeats(t *testing.T) {
 		t.Fatal("new epoch was marked repeated")
 	}
 }
+
+// TestFingerprintHashesLargeFilesBySizeAndHead 验证超大文件不再让指纹报错：
+// 按"总大小+头部哈希"入指纹，内容或大小变化必然改变指纹。
+func TestFingerprintHashesLargeFilesBySizeAndHead(t *testing.T) {
+	root := t.TempDir()
+	big := make([]byte, (8<<20)+100)
+	for i := range big[:1024] {
+		big[i] = byte(i)
+	}
+	if err := os.WriteFile(filepath.Join(root, "big.bin"), big, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "note.txt"), []byte("v1"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	first, err := workspace.Fingerprint(root)
+	if err != nil {
+		t.Fatalf("fingerprint failed on large file: %v", err)
+	}
+	if len(first) != 64 {
+		t.Fatalf("fingerprint = %q, want a sha256 hex string", first)
+	}
+	if err := os.WriteFile(filepath.Join(root, "note.txt"), []byte("v2"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	second, err := workspace.Fingerprint(root)
+	if err != nil || second == first {
+		t.Fatalf("content change must alter the fingerprint (second=%v err=%v)", second, err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "big.bin"), append(big, 7), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	third, err := workspace.Fingerprint(root)
+	if err != nil || third == second {
+		t.Fatalf("size change must alter the fingerprint (third=%v err=%v)", third, err)
+	}
+}
+
+// TestFingerprintIncludesSymlinkTarget 链接按链接文本入指纹；无符号链接权限时跳过。
+func TestFingerprintIncludesSymlinkTarget(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "note.txt"), []byte("v1"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("note.txt", filepath.Join(root, "link")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	first, err := workspace.Fingerprint(root)
+	if err != nil {
+		t.Fatalf("fingerprint failed on symlink: %v", err)
+	}
+	if err := os.Remove(filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("other.txt", filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	second, err := workspace.Fingerprint(root)
+	if err != nil || second == first {
+		t.Fatalf("link target change must alter the fingerprint (second=%v err=%v)", second, err)
+	}
+}

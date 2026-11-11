@@ -139,7 +139,7 @@ func runCLI(args []string) (runErr error) {
 	// 默认值来自配置文件（flag 显式传入时覆盖配置）。
 	workspace := flags.String("workspace", presetWorkspace, "workspace root")
 	maxSteps := flags.Int("max-steps", appConfig.MaxSteps, "maximum model iterations")
-	provider := flags.String("provider", appConfig.Provider, "model provider: demo, bailian or deepseek")
+	provider := flags.String("provider", pick(appConfig.Developer, appConfig.Provider), "model provider: demo, bailian or deepseek")
 	timeout := flags.Duration("timeout", appConfig.Timeout, "maximum duration of one run")
 	artifactDir := flags.String("artifact-dir", ".xcode-state/artifacts", "directory for full tool result artifacts")
 	eventLog := flags.String("event-log", "", "JSONL event log path (default .xcode-state/logs/run-<timestamp>.jsonl)")
@@ -166,7 +166,7 @@ func runCLI(args []string) (runErr error) {
 	reasoningEffort := flags.String("reasoning-effort", "high", "DeepSeek reasoning effort: low, high or max")
 	maxOutputTokens := flags.Int("max-output-tokens", 0, "DeepSeek per-request output limit (0 = 8192)")
 	orchestrate := flags.String("orchestrate", appConfig.Orchestrate, "orchestration mode: single, single-review or pipeline (default: full-tool agent with delegate available)")
-	reviewerProvider := flags.String("reviewer-provider", appConfig.ReviewerProvider, "cross-model reviewer provider for the completion gate (glm/deepseek/bailian); empty degrades to the developer model with a warning")
+	reviewerProvider := flags.String("reviewer-provider", pick(appConfig.Reviewer, appConfig.ReviewerProvider), "cross-model reviewer for the completion gate: a model-set slot name or a provider (glm/deepseek/bailian); empty degrades to the developer model with a warning")
 	reviewerModel := flags.String("reviewer-model", appConfig.ReviewerModel, "model id for the gate reviewer; overrides the provider default")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -291,9 +291,13 @@ func runCLI(args []string) (runErr error) {
 		return err
 	}
 	record.Config.Workspace = readOnlyTools.WorkspaceRoot()
-	// 根据 --provider 选择模型；密钥与端点来自配置文件（环境变量兜底）。
+	// Model selection: a config slot named after the provider wins (the
+	// model.<name>.* set); otherwise fall back to the per-provider keys.
 	var selectedModel harness.Model
-	if strings.EqualFold(*provider, "deepseek") {
+	if slot, ok := appConfig.ModelSlots[strings.ToLower(strings.TrimSpace(*provider))]; ok {
+		selectedModel, record.Config.Model, err = modelFromSlot(*provider, slot, *thinking, *reasoningEffort, *providerRetries, *maxOutputTokens)
+		record.Config.Provider = strings.ToLower(strings.TrimSpace(*provider))
+	} else if strings.EqualFold(*provider, "deepseek") {
 		selectedModel, err = deepseek.New(deepseekConfig)
 	} else {
 		selectedModel, err = buildModelWithRetryLimit(appConfig, *provider, *providerRetries)
@@ -308,12 +312,17 @@ func runCLI(args []string) (runErr error) {
 	// reviews degrade to the developer model with a triple warning).
 	var reviewerBase harness.Model
 	if rp := strings.TrimSpace(*reviewerProvider); rp != "" {
-		reviewerBase, record.Reviewer.Model, err = buildReviewerModel(appConfig, rp, *reviewerModel, *providerRetries)
+		if slot, ok := appConfig.ModelSlots[strings.ToLower(rp)]; ok {
+			// Slot names carry their own id, so reviewer-model does not apply.
+			reviewerBase, record.Reviewer.Model, err = modelFromSlot(rp, slot, *thinking, *reasoningEffort, *providerRetries, *maxOutputTokens)
+		} else {
+			reviewerBase, record.Reviewer.Model, err = buildReviewerModel(appConfig, rp, *reviewerModel, *providerRetries)
+		}
 		if err != nil {
 			return err
 		}
 		record.Reviewer.Configured = true
-		record.Reviewer.Provider = strings.ToLower(strings.TrimSpace(rp))
+		record.Reviewer.Provider = strings.ToLower(rp)
 	}
 	// 完整事件按 JSONL 落盘供事后排查；终端默认只渲染每步的极简进度行。
 	logPath := strings.TrimSpace(*eventLog)

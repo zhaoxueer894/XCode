@@ -199,11 +199,12 @@ xcode eval-fault                 故障注入评测：对比不同压缩/恢复�
 运行参数优先级：命令行 flag > 项目级 `.xcode/config` > 全局 `~/.xcode/config` > 内置默认值。常用的几项：
 
 ```text
-provider=bailian          # demo / bailian / deepseek / glm
-bailian-api-key=sk-...    # 供应商凭据三键见"配置模型"一节；base-url/model 有默认值
+developer=deepseek        # 开发模型：模型集里的槽位名（见下）
+reviewer=glm              # 审查模型：槽位名；不填则审查降级为开发模型并警告
+model.deepseek.key=sk-... # 模型集：model.<名字>.key / base-url / id，可配任意多个
+model.deepseek.base-url=https://api.deepseek.com
+model.deepseek.id=deepseek-flash
 orchestrate=              # 空(全工具智能体) / single / single-review / pipeline
-reviewer-provider=        # 完成门禁跨模型审查供应商（如 glm）；空=降级同模型并警告
-reviewer-model=           # 审查模型名；不填用该供应商默认模型
 mode=workspace-write      # plan / workspace-write / full-access
 context-strategy=bounded  # bounded / none / sliding / handoff / compaction / decision-gated
 context-budget=6000      # 模型可见历史的估算 token 目标；不含工具说明
