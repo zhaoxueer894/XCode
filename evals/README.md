@@ -165,3 +165,11 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o .eval/pilot-rerun/bu
 ## 2026-11-10 第三轮:多智能体首验(round 3)
 
 10 道新冻结题、委派开放、共享预算。**核心发现:10 道里 7 道 delegate 调用为零——"开放委派"不等于"使用委派",本轮实际不构成多智能体对照**;真正的 3 道多智能体运行(dayjs)1 过 2 败。过程中根治两个旧问题:capture 脚本的 Python 3.6 兼容(轮 2 django-9296 的追溯根因)、单条非法流式工具调用杀死整轮运行。完整分析见 [第三轮报告](UNSEEN_R3_REPORT.md)。
+
+## A/B/C 消融运行
+
+按交接文档第三节执行。预检、格子清单和 Harbor 适配器都从项目的 `.xcode/config` 读取 `developer`、`reviewer` 及对应的模型槽。密钥仅经进程环境传给 XCode。三个格子的 agent 都使用两模型端点的出网域名，独立 verifier 保持离线。[交接文档](../HANDOVER.md)
+
+启动或续跑时用 `>>` 追加 `.eval/ablation-driver.log`。续跑核对现有清单和二进制快照，并只把缺少 Harbor `result.json` 的题交给新 job。
+
+阶段预算版用 `sh evals/drive_ablation.sh --staged`，结果落在 `.eval/ablation/staged/`。正式开跑前可用 `--staged --pressure-task <冻结题 ID> --pressure-run <新编号>` 只跑 C 格的一道题，沿用正式预算和判分，结果落在 `.eval/ablation/staged-pressure/`。A/B/C 每题使用 50 万 token、100 次模型请求和 20 分钟运行上限，并使用同一可见功能检查。失败时最多返修一次，预留总 token 的 25% 和请求的 10%。功能通过后 B/C 做静态审查，独立 verifier 仍使用冻结题自带的判分。

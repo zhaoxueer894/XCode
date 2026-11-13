@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-algo-rotated-search",
+  "language": "python",
+  "kind": "algo",
+  "prompt": "Implement `search(values, target)` in solution.py: values is a sorted list of distinct integers rotated by an unknown amount. Return the index of target, or -1 when absent, in logarithmic time.",
+  "acceptance": [
+    "the function works on rotated and unrotated input",
+    "absent targets return -1",
+    "the search stays logarithmic"
+  ],
+  "tags": [
+    "algorithm",
+    "binary-search"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "go-mod-lru-cache",
+  "language": "go",
+  "kind": "module",
+  "prompt": "Implement LRUCache in solution.go: NewLRUCache(capacity) returns ErrCapacity for a non-positive capacity. Get returns the value and whether the key was present; Put stores a value and marks it most recently used; when a Put exceeds capacity, evict the least recently used entry. Len reports the number of stored entries.",
+  "acceptance": [
+    "reads and writes both refresh recency",
+    "eviction removes the least recently used entry",
+    "a non-positive capacity returns ErrCapacity"
+  ],
+  "tags": [
+    "module",
+    "cache"
+  ],
+  "verify_commands": [
+    [
+      "go",
+      "test",
+      "./..."
+    ]
+  ],
+  "hidden_command": [
+    [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ]
+  ]
+}

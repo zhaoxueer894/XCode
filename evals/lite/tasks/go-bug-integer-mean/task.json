@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "go-bug-integer-mean",
+  "language": "go",
+  "kind": "bugfix",
+  "prompt": "solution.go computes the mean with integer division, truncating any fraction. Fix Mean in solution.go so it returns the exact arithmetic mean while still returning ErrNoValues for an empty slice.",
+  "acceptance": [
+    "the mean keeps its fractional part",
+    "empty input still returns ErrNoValues"
+  ],
+  "tags": [
+    "bugfix",
+    "integer-division"
+  ],
+  "verify_commands": [
+    [
+      "go",
+      "test",
+      "./..."
+    ]
+  ],
+  "hidden_command": [
+    [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ]
+  ]
+}

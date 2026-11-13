@@ -62,17 +62,30 @@ func (p *runtimeProgress) observe(call ToolCall, result ToolResult, err error) {
 	if json.Unmarshal(call.Arguments, &args) != nil || args.Path == "" {
 		return
 	}
-	name := strings.ToLower(filepath.ToSlash(args.Path))
-	base := filepath.Base(name)
-	test := strings.HasPrefix(name, "tests/") || strings.HasPrefix(name, "test/") || strings.Contains(name, "/tests/") || strings.Contains(name, "/test/") || strings.HasSuffix(name, "_test.go") || strings.HasPrefix(base, "test_") || strings.Contains(base, ".test.") || strings.Contains(base, ".spec.") || base == "conftest.py"
-	if test {
+	if isTestPath(args.Path) {
 		p.TestEdits++
 		return
 	}
-	if strings.HasPrefix(name, "docs/") || strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".rst") || strings.HasSuffix(name, ".txt") {
+	if !IsProductionPath(args.Path) {
 		return
 	}
 	p.ProductionEdits++
 	p.CallsSinceEdit = 0
 	p.ExecOKAfterEdit = 0
+}
+
+func isTestPath(path string) bool {
+	name := strings.ToLower(filepath.ToSlash(path))
+	base := filepath.Base(name)
+	return strings.HasPrefix(name, "tests/") || strings.HasPrefix(name, "test/") ||
+		strings.Contains(name, "/tests/") || strings.Contains(name, "/test/") ||
+		strings.HasSuffix(name, "_test.go") || strings.HasPrefix(base, "test_") ||
+		strings.Contains(base, ".test.") || strings.Contains(base, ".spec.") || base == "conftest.py"
+}
+
+// IsProductionPath classifies changes consistently with the run's edit ledger.
+func IsProductionPath(path string) bool {
+	name := strings.ToLower(filepath.ToSlash(path))
+	return !isTestPath(name) && !strings.HasPrefix(name, "docs/") &&
+		!strings.HasSuffix(name, ".md") && !strings.HasSuffix(name, ".rst") && !strings.HasSuffix(name, ".txt")
 }

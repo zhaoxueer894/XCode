@@ -165,9 +165,13 @@ func runCLI(args []string) (runErr error) {
 	thinking := flags.String("thinking", "enabled", "DeepSeek thinking mode: enabled or disabled")
 	reasoningEffort := flags.String("reasoning-effort", "high", "DeepSeek reasoning effort: low, high or max")
 	maxOutputTokens := flags.Int("max-output-tokens", 0, "DeepSeek per-request output limit (0 = 8192)")
+	reviewerMaxOutputTokens := flags.Int("reviewer-max-output-tokens", 0, "per-request output limit for the gate reviewer (0 = 32768; a thinking reviewer must reason before emitting its verdict)")
 	orchestrate := flags.String("orchestrate", appConfig.Orchestrate, "orchestration mode: single, single-review or pipeline (default: full-tool agent with delegate available)")
 	reviewerProvider := flags.String("reviewer-provider", pick(appConfig.Reviewer, appConfig.ReviewerProvider), "cross-model reviewer for the completion gate: a model-set slot name or a provider (glm/deepseek/bailian); empty degrades to the developer model with a warning")
 	reviewerModel := flags.String("reviewer-model", appConfig.ReviewerModel, "model id for the gate reviewer; overrides the provider default")
+	strictReviewerMaxSteps := flags.Int("strict-reviewer-max-steps", 0, "reviewer step limit in strict cross-model mode (0 disables strict mode)")
+	allocateStageBudget := flags.Bool("allocate-stage-budget", false, "partition the run budget across review or pipeline stages")
+	functionalRepairOnce := flags.Bool("functional-repair-once", false, "reserve budget for one repair after visible functional checks fail")
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -314,16 +318,21 @@ func runCLI(args []string) (runErr error) {
 	if rp := strings.TrimSpace(*reviewerProvider); rp != "" {
 		if slot, ok := appConfig.ModelSlots[strings.ToLower(rp)]; ok {
 			// Slot names carry their own id, so reviewer-model does not apply.
-			reviewerBase, record.Reviewer.Model, err = modelFromSlot(rp, slot, *thinking, *reasoningEffort, *providerRetries, *maxOutputTokens)
+			reviewerBase, record.Reviewer.Model, err = modelFromSlot(rp, slot, *thinking, *reasoningEffort, *providerRetries, reviewerOutputBudget(*reviewerMaxOutputTokens))
 		} else {
-			reviewerBase, record.Reviewer.Model, err = buildReviewerModel(appConfig, rp, *reviewerModel, *providerRetries)
+			reviewerBase, record.Reviewer.Model, err = buildReviewerModel(appConfig, rp, *reviewerModel, *providerRetries, *reviewerMaxOutputTokens)
 		}
 		if err != nil {
 			return err
 		}
 		record.Reviewer.Configured = true
 		record.Reviewer.Provider = strings.ToLower(rp)
+		record.Reviewer.MaxOutputTokens = reviewerOutputBudget(*reviewerMaxOutputTokens)
 	}
+	if *strictReviewerMaxSteps < 0 || (*strictReviewerMaxSteps > 0 && reviewerBase == nil) {
+		return fmt.Errorf("--strict-reviewer-max-steps requires a positive limit and a configured reviewer")
+	}
+	record.Reviewer.StrictMaxSteps = *strictReviewerMaxSteps
 	// 完整事件按 JSONL 落盘供事后排查；终端默认只渲染每步的极简进度行。
 	logPath := strings.TrimSpace(*eventLog)
 	if logPath == "" {
@@ -373,7 +382,25 @@ func runCLI(args []string) (runErr error) {
 		}
 		writeCompactEvent(os.Stderr, event)
 	})
-	budget = harness.NewModelBudget(*maxModelCalls, *maxTokens, sink)
+	if *functionalRepairOnce {
+		mode := strings.ToLower(strings.TrimSpace(*orchestrate))
+		if !*nonInteractive || *contractFlag == "" || *maxTokens <= 0 || *maxModelCalls < 10 ||
+			(mode != "single" && (mode != "single-review" && mode != "pipeline" || !*allocateStageBudget || *strictReviewerMaxSteps <= 0)) {
+			return fmt.Errorf("--functional-repair-once requires a non-interactive run, a test contract, positive budgets, and strict staged review in B/C")
+		}
+		budget = harness.NewFunctionalModelBudget(*maxModelCalls, *maxTokens, mode, sink)
+		record.Config.FunctionalRepairOnce = true
+		record.Reviewer.StageBudget = *allocateStageBudget
+	} else if *allocateStageBudget {
+		mode := strings.ToLower(strings.TrimSpace(*orchestrate))
+		if (mode != "single-review" && mode != "pipeline") || *strictReviewerMaxSteps <= 0 {
+			return fmt.Errorf("--allocate-stage-budget requires strict review in single-review or pipeline mode")
+		}
+		budget = harness.NewStagedModelBudget(*maxModelCalls, *maxTokens, mode == "pipeline", sink)
+		record.Reviewer.StageBudget = true
+	} else {
+		budget = harness.NewModelBudget(*maxModelCalls, *maxTokens, sink)
+	}
 	summaryModel := budget.Wrap(selectedModel, "summary")
 	selectedModel = budget.Wrap(selectedModel, "agent")
 
@@ -384,27 +411,87 @@ func runCLI(args []string) (runErr error) {
 	var engineRef *policy.Engine
 	var checkpointsRef *checkpoint.Store
 	var approver executor.Approver
+	var candidatePatch func(context.Context) (bool, error)
+	if *allocateStageBudget || *functionalRepairOnce {
+		candidatePatch, err = stagedCandidatePatch(ctx, readOnlyTools.WorkspaceRoot())
+		if err != nil {
+			return err
+		}
+	}
 	if !*nonInteractive {
 		approver = newTerminalApprover()
 	}
 	delegate := harness.NewDelegate(
 		func(ctx context.Context, role, prompt string, maxSteps int, subSink harness.EventSink) (string, error) {
+			role = strings.ToLower(strings.TrimSpace(role))
+			isReviewer := role == "reviewer"
+			if isReviewer && *functionalRepairOnce && !harness.IsGateReview(ctx) {
+				return "", fmt.Errorf("static review starts only after the framework verifies the candidate")
+			}
+			if isReviewer && *strictReviewerMaxSteps > 0 {
+				maxSteps = *strictReviewerMaxSteps
+			}
 			subExecutor, err := executor.New(registryRef, engineRef, approver, checkpointsRef, subSink)
 			if err != nil {
 				return "", err
 			}
 			runSub := func(model harness.Model) (string, error) {
-				return harness.NewAgent(model, subExecutor, maxSteps, subSink).Run(ctx, prompt)
+				subagent := harness.NewAgent(model, subExecutor, maxSteps, subSink)
+				if *allocateStageBudget {
+					manager, err := contextmgr.NewManager(contextmgr.StrategyBounded, *contextBudget, nil)
+					if err != nil {
+						return "", err
+					}
+					subagent.SetContextManager(manager)
+					if isReviewer {
+						result, err := subagent.RunWithOptions(ctx, prompt, harness.RunOptions{
+							MaxSteps: min(2, maxSteps), FinalTextCheck: harness.ValidateGateVerdict,
+						})
+						return result.Answer, err
+					}
+					if role == "planner" || role == "developer" {
+						options := harness.RunOptions{WorkerHandoff: func(ctx context.Context, text string) error {
+							if err := validateWorkerHandoff(role, text); err != nil {
+								return err
+							}
+							if role == "developer" {
+								changed, err := candidatePatch(ctx)
+								if err != nil {
+									return err
+								}
+								if !changed {
+									return fmt.Errorf("developer left no production patch; implement the fix with apply_patch before returning")
+								}
+							}
+							return nil
+						}}
+						if role == "planner" {
+							prompt += plannerHandoffPrompt
+							options.WorkerCorrectionTextOnly = true
+							options.WorkerCorrectionPrompt = "Hand off now using the evidence already available. Return one plain-text paragraph of at most four sentences with the likely cause, relevant file or function, and next edit or check. If uncertain, state the best hypothesis. No tool calls or extra report."
+						} else {
+							options.CandidatePatch = candidatePatch
+							prompt += "\nMake the smallest justified production edit early with the structured apply_patch tool. Then run a focused check if possible and report actual results. Do not describe an unexecuted tool call as work."
+						}
+						result, err := subagent.RunWithOptions(ctx, prompt, options)
+						return result.Answer, err
+					}
+				}
+				return subagent.Run(ctx, prompt)
 			}
 			// Reviewer role: prefer the dedicated reviewer model. On a runtime
 			// failure (not budget exhaustion, not cancellation) this one review
 			// degrades to the developer model with a triple warning (stderr banner,
 			// review.degraded event, run-record mark); the next gate attempt
 			// retries the configured reviewer first.
-			if strings.EqualFold(role, "reviewer") && reviewerBase != nil {
+			if isReviewer && reviewerBase != nil {
 				result, runErr := runSub(budget.Wrap(reviewerBase, "sub:reviewer"))
 				if runErr == nil {
 					return result, nil
+				}
+				if *strictReviewerMaxSteps > 0 {
+					record.Reviewer.Reason = runErr.Error()
+					return result, fmt.Errorf("strict cross-model review failed: %w", runErr)
 				}
 				if errors.Is(runErr, harness.ErrBudget) || ctx.Err() != nil {
 					return result, runErr
@@ -654,6 +741,33 @@ func runCLI(args []string) (runErr error) {
 		return fmt.Errorf("orchestrate must be single, single-review or pipeline")
 	}
 	options.Orchestrate = orchestrateMode
+	options.StagedReview = *allocateStageBudget || *functionalRepairOnce
+	options.CandidatePatch = candidatePatch
+	if *functionalRepairOnce {
+		repairRegistry, err := harness.NewRegistry(baseTools...)
+		if err != nil {
+			return err
+		}
+		repairExecutor, err := executor.New(repairRegistry, engineRef, approver, checkpointsRef, sink)
+		if err != nil {
+			return err
+		}
+		options.FunctionalRepair = func(ctx context.Context, prompt string) error {
+			manager, err := contextmgr.NewManager(contextmgr.StrategyBounded, *contextBudget, nil)
+			if err != nil {
+				return err
+			}
+			repair := harness.NewAgent(budget.Wrap(baseModel, "repair"), repairExecutor, *maxSteps, sink)
+			repair.SetContextManager(manager)
+			_, err = repair.RunWithOptions(ctx, prompt, harness.RunOptions{
+				WorkerHandoff: func(_ context.Context, text string) error {
+					return validateWorkerHandoff("developer", text)
+				},
+				CandidatePatch: candidatePatch,
+			})
+			return err
+		}
+	}
 	if orchestrateMode == "pipeline" {
 		delegate.EnablePipeline()
 		options.PipelinePrecondition = delegate.MissingStages

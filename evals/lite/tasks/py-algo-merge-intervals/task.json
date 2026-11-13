@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-algo-merge-intervals",
+  "language": "python",
+  "kind": "algo",
+  "prompt": "Implement `merge(intervals)` in solution.py: given closed integer intervals as [start, end] pairs in any order, return the merged, sorted list. Overlapping and touching intervals merge; the input must not be modified.",
+  "acceptance": [
+    "overlapping and touching intervals merge into one",
+    "output is sorted by start and the caller's input list is left unchanged",
+    "contained intervals are absorbed"
+  ],
+  "tags": [
+    "algorithm",
+    "intervals"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

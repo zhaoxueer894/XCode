@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-mod-csv-splitter",
+  "language": "python",
+  "kind": "module",
+  "prompt": "Implement `split_line(line)` in solution.py: split one CSV record into fields. Commas separate fields, a double-quoted field may contain commas and doubled quotes (\"\" meaning one literal quote), and an empty field yields \"\". Raise ValueError when a quoted field is never closed.",
+  "acceptance": [
+    "quoted fields keep commas and unescape doubled quotes",
+    "empty and trailing fields are preserved",
+    "an unterminated quote raises ValueError"
+  ],
+  "tags": [
+    "module",
+    "parser"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

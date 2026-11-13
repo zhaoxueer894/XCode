@@ -3,6 +3,7 @@ package harness
 // 本文件实现运行控制：停止原因、Token 预算、doom-loop 检测与运行结果。
 
 import (
+	"context"
 	"encoding/json" // 规范化工具参数，使字段顺序不同的相同参数得到同一指纹。
 	"errors"        // 定义预算与 doom-loop 的哨兵错误。
 )
@@ -26,6 +27,10 @@ var ErrBudget = errors.New("agent token budget exhausted")
 // ErrDoomLoop 表示 Run 因连续重复相同工具调用而受控停止；调用方用 errors.Is 识别。
 var ErrDoomLoop = errors.New("agent repeated the same tool call too many times")
 
+// ErrIncompleteModelResponse marks a response that cannot safely be used
+// as a tool call or as the final output of a stage.
+var ErrIncompleteModelResponse = errors.New("incomplete model response")
+
 // defaultDoomLoopLimit 保存 doom-loop 的默认触发次数；连续相同达到该值即停止。
 const defaultDoomLoopLimit = 3
 
@@ -47,6 +52,14 @@ type RunOptions struct {
 	// PipelinePrecondition lists unfinished pipeline stages; a non-empty list
 	// blocks the completion gate (claims done before the developer ever ran).
 	PipelinePrecondition func() []string
+	StagedReview         bool
+	// FinalTextCheck is used for a tool-free stage with a required final format.
+	FinalTextCheck           func(string) error
+	WorkerHandoff            func(context.Context, string) error
+	WorkerCorrectionPrompt   string
+	WorkerCorrectionTextOnly bool
+	CandidatePatch           func(context.Context) (bool, error)
+	FunctionalRepair         func(context.Context, string) error
 }
 
 // advertisedTools filters the advertised tool set by orchestration mode.

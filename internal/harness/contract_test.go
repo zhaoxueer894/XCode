@@ -5,12 +5,131 @@ package harness_test
 import (
 	"context"       // 驱动 RunTurn。
 	"encoding/json" // 桩工具的 Execute 签名需要。
-	"strings"       // 断言门禁消息与原因。
-	"sync"          // 保护桩工具的调用计数。
-	"testing"       // Go 标准测试框架。
+	"errors"
+	"strings" // 断言门禁消息与原因。
+	"sync"    // 保护桩工具的调用计数。
+	"testing" // Go 标准测试框架。
 
 	"xcode/internal/harness" // 被测对象：TaskContract、RunOptions 与 RunTurn 门禁挂钩。
 )
+
+func TestStagedGateReviewsPatchWhenMainBudgetEnds(t *testing.T) {
+	for _, verifyExit := range []string{"0", "1"} {
+		t.Run(verifyExit, func(t *testing.T) {
+			f := newGateFixture(true)
+			f.exec.observations = []string{"command=verify exit_code=" + verifyExit + " duration_ms=1"}
+			diff := staticTool{name: "git_diff", output: "a real patch"}
+			patch := staticTool{name: "apply_patch", output: "updated"}
+			registry, err := harness.NewRegistry(f.exec, f.delegate, diff, patch)
+			if err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			model := modelFunc(func(_ context.Context, _ []harness.Message, _ []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+				calls++
+				if calls == 1 {
+					return harness.ModelResponse{ToolCalls: []harness.ToolCall{{
+						ID: "patch", Name: "apply_patch", Arguments: json.RawMessage(`{"path":"source.go"}`),
+					}}}, nil
+				}
+				return harness.ModelResponse{}, harness.ErrBudget
+			})
+			options := gateOptions(&harness.TaskContract{Goal: "fix", Review: true,
+				VerifyCommands: []harness.VerifyCommand{{Name: "verify", Command: []string{"verify"}}}},
+				fixedFingerprint("patched"))
+			options.StagedReview = true
+			result, err := harness.NewAgent(model, registry, 4, nil).RunWithOptions(context.Background(), "fix", options)
+			if f.delegate.Calls() != 1 {
+				t.Fatalf("review was called %d times", f.delegate.Calls())
+			}
+			if verifyExit == "0" && (err != nil || result.StopReason != harness.StopCompleted) {
+				t.Fatalf("verified patch failed handoff: %v, %s", err, result.StopReason)
+			}
+			if verifyExit != "0" && !errors.Is(err, harness.ErrBudget) {
+				t.Fatalf("failed verification should block completion: %v", err)
+			}
+		})
+	}
+}
+
+func TestToolFreeReviewerRetriesInvalidVerdictWithoutExecutingTool(t *testing.T) {
+	tool := &gateStubTool{name: "exec", observations: []string{"must not run"}}
+	registry, _ := harness.NewRegistry(tool)
+	calls := 0
+	model := modelFunc(func(_ context.Context, messages []harness.Message, tools []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+		calls++
+		if len(tools) != 0 {
+			t.Fatal("reviewer was offered tools")
+		}
+		if calls == 1 {
+			return harness.ModelResponse{ToolCalls: []harness.ToolCall{{ID: "invalid", Name: "exec"}}}, nil
+		}
+		if len(messages) != 2 || messages[1].Role != "user" {
+			t.Fatalf("review retry should omit the invalid assistant message: %+v", messages)
+		}
+		return harness.ModelResponse{Content: "GATE-VERDICT: PASS"}, nil
+	})
+	result, err := harness.NewAgent(model, registry, 2, nil).RunWithOptions(context.Background(), "review", harness.RunOptions{
+		FinalTextCheck: harness.ValidateGateVerdict,
+	})
+	if err != nil || result.StopReason != harness.StopCompleted || tool.Calls() != 0 || calls != 2 {
+		t.Fatalf("review retry: result=%+v calls=%d tool calls=%d error=%v", result, calls, tool.Calls(), err)
+	}
+}
+
+func TestStagedPipelineHandsOffAfterDeveloperPatch(t *testing.T) {
+	f := newGateFixture(false)
+	diff := staticTool{name: "git_diff", output: "patch evidence"}
+	patch := staticTool{name: "apply_patch", output: "updated"}
+	workerTools, _ := harness.NewRegistry(patch)
+	reviewCalls := 0
+	delegate := harness.NewDelegate(func(ctx context.Context, role, _ string, _ int, _ harness.EventSink) (string, error) {
+		switch role {
+		case "planner":
+			return "Implement the source fix.", nil
+		case "reviewer":
+			reviewCalls++
+			return "GATE-VERDICT: PASS", nil
+		default:
+			calls := 0
+			worker := modelFunc(func(context.Context, []harness.Message, []harness.ToolSpec, harness.ModelEventSink) (harness.ModelResponse, error) {
+				calls++
+				if calls == 1 {
+					return harness.ModelResponse{ToolCalls: []harness.ToolCall{{
+						ID: "patch", Name: "apply_patch", Arguments: json.RawMessage(`{"path":"source.go"}`),
+					}}}, nil
+				}
+				return harness.ModelResponse{Content: "patched"}, nil
+			})
+			return harness.NewAgent(worker, workerTools, 2, nil).Run(ctx, "fix")
+		}
+	}, t.TempDir())
+	delegate.EnablePipeline()
+	registry, _ := harness.NewRegistry(f.exec, diff, delegate)
+	mainCalls := 0
+	model := modelFunc(func(context.Context, []harness.Message, []harness.ToolSpec, harness.ModelEventSink) (harness.ModelResponse, error) {
+		mainCalls++
+		role := "planner"
+		if mainCalls == 2 {
+			role = "developer"
+		} else if mainCalls > 2 {
+			t.Fatal("handoff needed an extra orchestrator request")
+		}
+		args, _ := json.Marshal(map[string]string{"role": role, "prompt": "fix"})
+		return harness.ModelResponse{ToolCalls: []harness.ToolCall{{ID: role, Name: "delegate", Arguments: args}}}, nil
+	})
+	options := gateOptions(&harness.TaskContract{Goal: "fix", Review: true,
+		VerifyCommands: []harness.VerifyCommand{{Name: "verify", Command: []string{"verify"}}}},
+		fixedFingerprint("patched"))
+	options.Orchestrate = "pipeline"
+	options.StagedReview = true
+	options.PipelinePrecondition = delegate.MissingStages
+	result, err := harness.NewAgent(model, registry, 3, nil).RunWithOptions(
+		harness.WithRunProgress(context.Background()), "fix", options)
+	if err != nil || result.StopReason != harness.StopCompleted || reviewCalls != 1 || mainCalls != 2 {
+		t.Fatalf("pipeline handoff: result=%+v review calls=%d main calls=%d error=%v", result, reviewCalls, mainCalls, err)
+	}
+}
 
 // scriptedTextModel 按预设依次返回纯文本响应；全部用尽后重复最后一条。
 type scriptedTextModel struct {
@@ -84,6 +203,121 @@ type gateFixture struct {
 // fixedFingerprint 返回始终为同一指纹的函数。
 func fixedFingerprint(value string) func() (string, error) {
 	return func() (string, error) { return value, nil }
+}
+
+func TestSingleReviewCorrectsMissingSubmissionBeforeFunctionalGate(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		cap   int
+		edits bool
+	}{
+		{name: "premature text handoff", cap: 100, edits: true},
+		{name: "stage closing request", cap: 2, edits: true},
+		{name: "correction still empty", cap: 2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newGateFixture(true)
+			edit := &gateStubTool{name: "apply_patch", observations: []string{"patched"}}
+			diff := &gateStubTool{name: "git_diff", observations: []string{"diff --git a/main.go b/main.go"}}
+			registry, err := harness.NewRegistry(f.exec, f.delegate, edit, diff)
+			if err != nil {
+				t.Fatal(err)
+			}
+			model := modelFunc(func(ctx context.Context, _ []harness.Message, tools []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+				if !harness.IsSubmissionCorrection(ctx) {
+					return harness.ModelResponse{Content: "<｜｜DSML｜｜ calls>", FinishReason: "stop"}, nil
+				}
+				if len(tools) != 1 || tools[0].Name != "apply_patch" || f.exec.Calls() != 0 || f.delegate.Calls() != 0 {
+					t.Fatalf("invalid correction order or toolset: %v", tools)
+				}
+				if !test.edits {
+					return harness.ModelResponse{Content: "unable to patch", FinishReason: "stop"}, nil
+				}
+				return harness.ModelResponse{FinishReason: "tool_calls", ToolCalls: []harness.ToolCall{
+					{ID: "edit", Name: "apply_patch", Arguments: json.RawMessage(`{}`)},
+				}}, nil
+			})
+			budget := harness.NewFunctionalModelBudget(test.cap, 0, "single-review", nil)
+			agent := harness.NewAgent(budget.Wrap(model, "agent"), registry, 4, nil)
+			options := gateOptions(&harness.TaskContract{
+				Goal: "implement fix", Review: true, VerifyCommands: []harness.VerifyCommand{{Name: "test", Command: []string{"test"}}},
+			}, fixedFingerprint("fp"))
+			options.Orchestrate = "single-review"
+			options.StagedReview = true
+			options.CandidatePatch = func(context.Context) (bool, error) { return edit.Calls() > 0, nil }
+			options.FunctionalRepair = func(context.Context, string) error {
+				t.Fatal("successful tests or missing patch must not spend the functional repair reserve")
+				return nil
+			}
+			result, err := agent.RunWithOptions(t.Context(), "fix", options)
+			if test.edits {
+				if err != nil || result.StopReason != harness.StopCompleted || edit.Calls() != 1 || f.exec.Calls() != 1 || f.delegate.Calls() != 1 {
+					t.Fatalf("result=%+v err=%v edit=%d verify=%d review=%d", result, err, edit.Calls(), f.exec.Calls(), f.delegate.Calls())
+				}
+			} else if err == nil || !strings.Contains(err.Error(), "no production-code change") || f.exec.Calls() != 0 || f.delegate.Calls() != 0 {
+				t.Fatalf("missing patch reached verification or was misreported: %+v, %v", result, err)
+			}
+		})
+	}
+}
+
+func TestFunctionalGateRepairsAtMostOnceAndReviewsOnlyPassingPatch(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		exits         []string
+		wantRepairs   int
+		wantReviews   int
+		wantCompleted bool
+	}{
+		{"pass first", []string{"0"}, 0, 1, true},
+		{"repair passes", []string{"1", "0"}, 1, 1, true},
+		{"repair fails", []string{"1", "1"}, 1, 0, false},
+		{"command missing", []string{"127"}, 0, 0, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newGateFixture(true)
+			f.exec.observations = nil
+			for _, exit := range test.exits {
+				f.exec.observations = append(f.exec.observations, "command=verify exit_code="+exit+" duration_ms=1")
+			}
+			// Valid static findings are recorded and do not trigger another repair.
+			f.delegate.observations = []string{"GATE-VERDICT: ISSUES: consider a clearer variable name"}
+			diff := staticTool{name: "git_diff", output: "patch evidence"}
+			registry, _ := harness.NewRegistry(f.exec, f.delegate, diff)
+			model := &scriptedTextModel{answers: []string{"done"}}
+			options := gateOptions(&harness.TaskContract{Goal: "fix", Review: true,
+				VerifyCommands: []harness.VerifyCommand{{Name: "verify", Command: []string{"verify"}}}},
+				fixedFingerprint("candidate"))
+			repairs := 0
+			options.FunctionalRepair = func(_ context.Context, prompt string) error {
+				repairs++
+				if !strings.Contains(prompt, "verify: exit 1") {
+					t.Fatalf("repair did not receive test feedback: %s", prompt)
+				}
+				return nil
+			}
+			var events []harness.Event
+			agent := harness.NewAgent(model, registry, 5, harness.EventSinkFunc(func(event harness.Event) {
+				events = append(events, event)
+			}))
+			result, err := agent.RunWithOptions(t.Context(), "fix", options)
+			if (err == nil) != test.wantCompleted || (result.StopReason == harness.StopCompleted) != test.wantCompleted ||
+				repairs != test.wantRepairs || f.delegate.Calls() != test.wantReviews ||
+				f.exec.Calls() != len(test.exits) || model.calls != 1 {
+				t.Fatalf("result=%+v err=%v repairs=%d reviews=%d tests=%d main requests=%d",
+					result, err, repairs, f.delegate.Calls(), f.exec.Calls(), model.calls)
+			}
+			verificationEvents := 0
+			for _, event := range events {
+				if event.Kind == harness.FunctionalVerification {
+					verificationEvents++
+				}
+			}
+			if verificationEvents != len(test.exits) {
+				t.Fatalf("logged %d verification attempts, want %d", verificationEvents, len(test.exits))
+			}
+		})
+	}
 }
 
 // gateOptions 组装启用门禁的 RunOptions。

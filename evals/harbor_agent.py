@@ -12,6 +12,7 @@ import tempfile
 from harbor.agents.installed.base import BaseInstalledAgent, with_prompt_template
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
+from evals.ablation_config import load_models
 
 
 def as_bool(value: bool | str) -> bool:
@@ -26,9 +27,17 @@ class XCodeAgent(BaseInstalledAgent):
     def __init__(
         self, *args, binary_path: str = "bin/xcode-linux-amd64",
         workspace: str = "/app", provider: str = "deepseek", credentials_file: str | None = None,
+        xcode_config: str | None = None,
         no_delegate: bool | str = False, max_model_calls: int = 100,
         orchestrate: str = "", reviewer_provider: str = "", reviewer_model: str = "",
+        strict_reviewer_max_steps: int = 0, reviewer_max_output_tokens: int = 0,
+        allocate_stage_budget: bool | str = False,
+        functional_repair_once: bool | str = False,
+        gate_contract: str | None = None,
+        external_node_modules: bool | str = False,
+        task_runtime_manifest: str | None = None,
         max_tokens: int = 0, max_steps: int = 100, timeout_sec: int = 1200,
+        developer_max_output_tokens: int = 8192,
         context_strategy: str = "bounded", context_budget: int = 6000, **kwargs,
     ):
         self.conda_env = kwargs.pop("conda_env", None)
@@ -44,13 +53,28 @@ class XCodeAgent(BaseInstalledAgent):
             raise ValueError("provider must be bailian, deepseek or demo")
         self.workspace, self.provider = workspace, provider
         self.credentials_file = Path(credentials_file) if credentials_file else None
+        self.xcode_config = Path(xcode_config) if xcode_config else None
+        if self.xcode_config and self.credentials_file:
+            raise ValueError("use either xcode_config or credentials_file")
         self.no_delegate = as_bool(no_delegate)
         self.orchestrate, self.reviewer_provider, self.reviewer_model = orchestrate, reviewer_provider, reviewer_model
+        self.strict_reviewer_max_steps = int(strict_reviewer_max_steps)
+        self.reviewer_max_output_tokens = int(reviewer_max_output_tokens)
+        self.allocate_stage_budget = as_bool(allocate_stage_budget)
+        self.functional_repair_once = as_bool(functional_repair_once)
+        self.gate_contract = Path(gate_contract).resolve(strict=True) if gate_contract else None
+        self.external_node_modules = as_bool(external_node_modules)
+        self.task_runtime_manifest = Path(task_runtime_manifest).resolve(strict=True) if task_runtime_manifest else None
+        if self.task_runtime_manifest and (self.gate_contract or self.external_node_modules):
+            raise ValueError("use task_runtime_manifest or explicit task runtime options")
         self.max_model_calls, self.max_tokens = int(max_model_calls), int(max_tokens)
         self.max_steps, self.timeout_sec = int(max_steps), int(timeout_sec)
+        self.developer_max_output_tokens = int(developer_max_output_tokens)
         self.context_strategy, self.context_budget = context_strategy, int(context_budget)
-        if min(self.max_model_calls, self.max_steps, self.timeout_sec, self.context_budget) <= 0 or self.max_tokens < 0:
-            raise ValueError("positive call, step, time and context limits are required")
+        if min(self.max_steps, self.timeout_sec, self.context_budget, self.developer_max_output_tokens) <= 0 or min(
+            self.max_tokens, self.max_model_calls
+        ) < 0:
+            raise ValueError("positive step, time, context and output limits and nonnegative total budgets are required")
 
     @staticmethod
     def name() -> str:
@@ -79,7 +103,16 @@ class XCodeAgent(BaseInstalledAgent):
         if conda_env == "auto":
             conda_env = None
         env = {}
-        if self.provider != "demo":
+        if self.xcode_config:
+            developer, reviewer = load_models(self.xcode_config)
+            if self.provider != developer.provider or (self.model_name and self.model_name != developer.model_id):
+                raise ValueError("Harbor developer selection differs from the XCode config")
+            env = developer.environment()
+            if self.orchestrate in {"single-review", "pipeline"}:
+                if (self.reviewer_provider, self.reviewer_model) != (reviewer.provider, reviewer.model_id):
+                    raise ValueError("Harbor reviewer selection differs from the XCode config")
+                env.update(reviewer.environment())
+        elif self.provider != "demo":
             prefix = "DEEPSEEK" if self.provider == "deepseek" else "DASHSCOPE"
             key = self._extra_env.get(f"{prefix}_API_KEY") or os.environ.get(f"{prefix}_API_KEY")
             model = self.model_name
@@ -107,23 +140,57 @@ class XCodeAgent(BaseInstalledAgent):
             }
         # Cross-model reviewer: GLM credentials reach the container only as env
         # vars; never in command text or uploaded files.
-        for name in ("GLM_API_KEY", "GLM_MODEL", "GLM_BASE_URL"):
-            value = self._extra_env.get(name) or os.environ.get(name)
-            if value:
-                env[name] = value
+        if not self.xcode_config:
+            for name in ("GLM_API_KEY", "GLM_MODEL", "GLM_BASE_URL"):
+                value = self._extra_env.get(name) or os.environ.get(name)
+                if value:
+                    env[name] = value
         logs = str(self.environment_logs_dir)
         prepared = await environment.exec(command=f"mkdir -p {shlex.quote(logs)}; git rev-parse HEAD", cwd=self.workspace)
         if prepared.return_code:
             raise RuntimeError("task workspace must be a prepared Git repository")
         base = (prepared.stdout or "").strip()
+        external_node_modules = self.external_node_modules
+        verify_command = []
+        if self.task_runtime_manifest:
+            task_id, *_ = self.session_id.rsplit("__", 2)
+            runtime = json.loads(self.task_runtime_manifest.read_text(encoding="utf-8"))["task_runtime"]
+            if task_id not in runtime:
+                raise ValueError(f"no runtime profile for frozen task {task_id!r}")
+            profile = runtime[task_id]
+            external_node_modules = profile["external_node_modules"]
+            verify_command = profile["verify_command"]
+        if external_node_modules:
+            # Keep preinstalled, ignored dependencies outside the disposable
+            # repository's rollback scope while retaining normal Node resolution.
+            moved = await environment.exec(
+                command='set -e; test -d node_modules; test ! -L node_modules; '
+                        'git check-ignore -q node_modules/; test -z "$(git ls-files -- node_modules)"; '
+                        'test ! -e /installed-agent/node_modules; '
+                        'mv node_modules /installed-agent/node_modules; '
+                        'ln -s /installed-agent/node_modules node_modules',
+                cwd=self.workspace,
+            )
+            if moved.return_code:
+                raise RuntimeError("could not move ignored Node dependencies outside the task workspace")
+        if self.gate_contract:
+            await environment.upload_file(self.gate_contract, "/installed-agent/gate-contract.json")
         with tempfile.TemporaryDirectory(prefix="xcode-prompt-") as directory:
             path = Path(directory) / "task.txt"
             path.write_text(instruction, encoding="utf-8")
             await environment.upload_file(path, f"{logs}/task.txt")
+            if verify_command:
+                contract = Path(directory) / "gate-contract.json"
+                contract.write_text(json.dumps({
+                    "goal": instruction,
+                    "review": self.orchestrate != "single",
+                    "verify_commands": [{"name": "focused repository tests", "command": verify_command}],
+                }), encoding="utf-8")
+                await environment.upload_file(contract, "/installed-agent/gate-contract.json")
         args = [
             "/installed-agent/xcode", "--isolated", "--non-interactive",
             "--provider", self.provider, "--provider-retries", "0",
-            "--thinking", "enabled", "--reasoning-effort", "high", "--max-output-tokens", "8192",
+            "--thinking", "enabled", "--reasoning-effort", "high", "--max-output-tokens", str(self.developer_max_output_tokens),
             "--workspace", self.workspace, "--sandbox", "host",
             # This permission is only for the disposable task container. Safety
             # suites must use a separate profile with explicit policy/approvals.
@@ -142,6 +209,16 @@ class XCodeAgent(BaseInstalledAgent):
             args += ["--reviewer-provider", str(self.reviewer_provider)]
         if self.reviewer_model:
             args += ["--reviewer-model", str(self.reviewer_model)]
+        if self.strict_reviewer_max_steps:
+            args += ["--strict-reviewer-max-steps", str(self.strict_reviewer_max_steps)]
+        if self.reviewer_max_output_tokens:
+            args += ["--reviewer-max-output-tokens", str(self.reviewer_max_output_tokens)]
+        if self.allocate_stage_budget:
+            args.append("--allocate-stage-budget")
+        if self.functional_repair_once:
+            args.append("--functional-repair-once")
+        if self.gate_contract or verify_command:
+            args += ["--contract", "/installed-agent/gate-contract.json"]
         capture = ["python3", "/installed-agent/capture_patch.py", "--workspace", self.workspace,
                    "--base-commit", base, "--output", f"{logs}/model.patch"]
         # CLI budget/timeout failures still produce a patch and proceed to grading.

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-algo-run-length",
+  "language": "python",
+  "kind": "algo",
+  "prompt": "Implement run-length encoding in solution.py. `encode(text)` returns a list of [character, count] pairs in order, and returns [] for empty input. `decode(pairs)` rebuilds the original string. Keep both signatures unchanged.",
+  "acceptance": [
+    "encode folds consecutive equal characters into [char, count] pairs",
+    "decode inverts encode exactly, including counts above nine and non-ASCII text",
+    "empty input returns an empty list"
+  ],
+  "tags": [
+    "algorithm",
+    "string"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

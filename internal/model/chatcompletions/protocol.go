@@ -2,6 +2,8 @@ package chatcompletions
 
 // chatRequest 表示发送给百炼 /chat/completions 的请求体。
 type chatRequest struct {
+	ResponseFormat  *responseFormat `json:"response_format,omitempty"`
+	ToolChoice      string          `json:"tool_choice,omitempty"`
 	Thinking        *thinkingConfig `json:"thinking,omitempty"`
 	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
 	MaxTokens       int             `json:"max_tokens,omitempty"`
@@ -10,6 +12,10 @@ type chatRequest struct {
 	Tools           []chatTool      `json:"tools,omitempty"` // 可用本地工具声明。
 	Stream          bool            `json:"stream"`          // true 表示使用 SSE 流式输出。
 	StreamOptions   streamOptions   `json:"stream_options"`  // 控制流式响应附加信息。
+}
+
+type responseFormat struct {
+	Type string `json:"type"`
 }
 
 type thinkingConfig struct {

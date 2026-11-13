@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "go-algo-toposort",
+  "language": "go",
+  "kind": "algo",
+  "prompt": "Implement TopoOrder in solution.go: return a slice ordering every node so each edge points forward, choosing the alphabetically smallest available node at each step. Return ErrCycle for a cyclic graph, and an error for an edge naming an unknown node.",
+  "acceptance": [
+    "every edge points forward in the returned order",
+    "ties are broken by node name",
+    "cycles return ErrCycle; unknown nodes return an error"
+  ],
+  "tags": [
+    "algorithm",
+    "graph"
+  ],
+  "verify_commands": [
+    [
+      "go",
+      "test",
+      "./..."
+    ]
+  ],
+  "hidden_command": [
+    [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ]
+  ]
+}

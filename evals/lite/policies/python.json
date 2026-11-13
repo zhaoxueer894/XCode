@@ -1,0 +1,46 @@
+{
+  "rules": [
+    {
+      "id": "python-unittest",
+      "tool": "exec",
+      "command_prefix": ["python", "-m", "unittest"],
+      "decision": "allow",
+      "reason": "Run the task's own unit tests unattended."
+    },
+    {
+      "id": "python3-unittest",
+      "tool": "exec",
+      "command_prefix": ["python3", "-m", "unittest"],
+      "decision": "allow",
+      "reason": "Run the task's own unit tests unattended."
+    },
+    {
+      "id": "python-pytest",
+      "tool": "exec",
+      "command_prefix": ["python", "-m", "pytest"],
+      "decision": "allow",
+      "reason": "Run the task's own unit tests unattended."
+    },
+    {
+      "id": "python3-pytest",
+      "tool": "exec",
+      "command_prefix": ["python3", "-m", "pytest"],
+      "decision": "allow",
+      "reason": "Run the task's own unit tests unattended."
+    },
+    {
+      "id": "python-compile",
+      "tool": "exec",
+      "command_prefix": ["python", "-m", "py_compile"],
+      "decision": "allow",
+      "reason": "Syntax-check a Python source file."
+    },
+    {
+      "id": "python3-compile",
+      "tool": "exec",
+      "command_prefix": ["python3", "-m", "py_compile"],
+      "decision": "allow",
+      "reason": "Syntax-check a Python source file."
+    }
+  ]
+}

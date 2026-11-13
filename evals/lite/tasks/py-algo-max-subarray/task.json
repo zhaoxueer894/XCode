@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-algo-max-subarray",
+  "language": "python",
+  "kind": "algo",
+  "prompt": "Implement `max_subarray_sum(values)` in solution.py using a single linear pass: return the largest sum of a non-empty contiguous subarray. Raise ValueError for empty input.",
+  "acceptance": [
+    "the maximum is over non-empty contiguous subarrays only",
+    "all-negative input returns the largest single value",
+    "empty input raises ValueError"
+  ],
+  "tags": [
+    "algorithm",
+    "dynamic-programming"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

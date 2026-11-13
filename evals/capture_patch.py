@@ -15,7 +15,8 @@ def capture_patch(workspace, base_commit, output):
     workspace = workspace.resolve(strict=True)
     if not re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", base_commit):
         raise ValueError("base_commit must be the pinned full commit hash")
-    if output.resolve().is_relative_to(workspace):
+    resolved_output = output.resolve()
+    if resolved_output == workspace or workspace in resolved_output.parents:
         raise ValueError("store evaluation artifacts outside the task workspace")
     # A separate index prevents staged user/agent changes from being overwritten.
     with tempfile.TemporaryDirectory(prefix="xcode-patch-") as directory:

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "py-bug-window-maxima",
+  "language": "python",
+  "kind": "bugfix",
+  "prompt": "solution.py computes the maximum of every sliding window but drops the final window. Fix `window_maxima` in solution.py so it returns one maximum per window, including the last. Run test_visible.py to see the failure.",
+  "acceptance": [
+    "every window, including the last, contributes one maximum",
+    "the width validation behaviour is preserved"
+  ],
+  "tags": [
+    "bugfix",
+    "off-by-one"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

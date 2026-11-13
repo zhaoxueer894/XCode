@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "go-bug-window-maxima",
+  "language": "go",
+  "kind": "bugfix",
+  "prompt": "solution.go computes the maximum of every sliding window but omits the final window. Fix WindowMaxima in solution.go so it returns one maximum per window, including the last, while keeping the width validation. Run `go test ./...` to see the failure.",
+  "acceptance": [
+    "every window, including the last, contributes one maximum",
+    "invalid widths still return ErrWidth"
+  ],
+  "tags": [
+    "bugfix",
+    "off-by-one"
+  ],
+  "verify_commands": [
+    [
+      "go",
+      "test",
+      "./..."
+    ]
+  ],
+  "hidden_command": [
+    [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ]
+  ]
+}

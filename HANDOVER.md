@@ -32,6 +32,17 @@ XCode 是 COMP5584 课程小组项目:用 Go 写的多智能体编码 CLI。给�
 - 最新一轮(round 3,2026-11-10):10 道冻结未见题,多智能体首次开放委派。结果 8 道公平判定、3 道通过。**核心发现:10 道里 7 道 delegate 调用为零——编排者几乎总是自己做完,"开放委派"不等于"使用委派"**。所以 round 3 不构成多智能体 vs 单智能体的对照,这正是消融实验要解决的问题:用强制拓扑(pipeline)保证多智能体真实发生,再对比。
 - 过程中根治了两个基础设施 bug:capture 脚本 Python 3.6 兼容(c5039b5)、非法流式工具调用不再杀死整个请求(57ccbfa),均有回归测试。
 
+### 轻量评测线(2026-11-11 新增,与上面这条线并行)
+
+`evals/lite/` 是独立第二条评测线,产物在 `.eval/lite/`,**不与 Harbor/SWE 线互相干扰**(不碰 `drive_ablation.sh`、`prepare_ablation.py`、`harbor_agent.py`,不占 `.eval/ablation/`)。
+
+- **为什么**:SWE 线单题要 Docker + 镜像 + 几分钟到十几分钟,10 道题的样本量方差太大。轻量线用"小文件 + 单元测试",单题毫秒到数秒,可以扩到 100–200 道,消融(尤其 A/B/C 拓扑对照)才有统计意义。
+- **三类题**:`algo`(单文件算法)、`module`(按 spec 实现 parser / 缓存 / 令牌桶等)、`bugfix`(50–200 行代码 + 失败测试)。Python 与 Go 两种语言,均无外部依赖。
+- **当前状态**:25 道种子题已量产,`calibrate.py` 全部 25/25 校准通过(参考解通过 + 空补丁失败,可见测试与隐藏测试都得如此);已用离线 demo 模型和参考解脚本验证过完整链路(policy 放行 → 门禁拦停 → 导出 patch → 干净树跑隐藏测试判分)。
+- **判分隔离**:agent 只看到 `starter/`;判分在另一份干净副本上应用候选 patch 后再叠 `hidden/`,因此**改坏或删掉可见测试都不能改变成绩**(已实测:篡改/删除可见测试仍判 fail,空补丁也判 fail)。可见测试命令进完成门禁,隐藏测试只在 runner 侧跑。
+- **待办**:尚未跑真实模型轮(会把额度计入正在跑的 B/C 消融),等消融数据出来后用 `--cells single,single-review,pipeline` 跑第一批真实对照。命令与红线见 [evals/lite/README.md](evals/lite/README.md)。
+
+
 ## 三、接下来的任务(按顺序)
 
 ### 1. 消融实验(最优先,数据是 slides 的命根子)
@@ -46,7 +57,7 @@ A/B/C 三格,同一批 round 3 冻结题(10 道)、同预算(每题 20 万 token
 
 **前置条件(缺一不可):**
 
-- ~~GLM 充值~~ **已解决**:2026-11-11 换了新 key(在 `.xcode/config` 的 `model.glm.key`),实测有余额、真实调用成功。driver 的 preflight 仍会在开跑时再做一次最小调用复核,失败即终止——这是刻意设计,避免 B/C 全程降级污染数据。
+- Driver 在开跑时从 `.xcode/config` 读取当前开发和审查模型的地址、模型 ID 和密钥，各做一次最小调用。任一调用失败就终止，避免 B/C 在审查链路不可用时启动。
 - 用户明确批准后才跑(driver 文件头就是这么写的)。
 
 **怎么跑(两步,顺序不能反):**
@@ -57,15 +68,15 @@ A/B/C 三格,同一批 round 3 冻结题(10 道)、同预算(每题 20 万 token
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o bin/xcode-linux-amd64 ./cmd/xcode
 
 # 第 2 步,WSL 里(仓库根目录),detached 启动(直接后台跑会被 WSL 会话回收杀掉):
-setsid sh evals/drive_ablation.sh > .eval/ablation-driver.log 2>&1 < /dev/null &
+setsid sh evals/drive_ablation.sh >> .eval/ablation-driver.log 2>&1 < /dev/null &
 sleep 30 && tail -5 .eval/ablation-driver.log   # 确认 preflight 过了再离开
 ```
 
-driver 自动:二进制新鲜度校验 → GLM 余额 preflight → 生成三格目录 → 逐格跑 harbor(2 路并发)。**全程约 6-7 小时**(每格 ~2h),中途别杀;隔 10-15 分钟 tail 一次日志看进度即可。
+Driver 自动执行模型预检、二进制新鲜度校验、三格准备和逐格 Harbor 运行（每格 2 路并发）。**全程约 6-7 小时**（每格约 2 小时）。每 10–15 分钟查看一次日志。启动和续跑都用 `>>` 追加 driver 日志。
 
 每格跑完的验收:`.eval/ablation/<cell>/harbor/xcode-v1/` 下应有 **10 个** trial 目录(各含 result.json、agent/events.jsonl、model.patch、verifier 判分),console.log 末尾有该格 exit 码。三格全跑完才算消融结束,进入分析(见下一节)。
 
-注意 driver 里路径写死为 `/mnt/d/Projects/XCode`,代理写死为网关 IP 的 7897 端口,换机器要改。
+Driver 使用 `/mnt/d/Projects/XCode` 作为仓库路径。三个格子都向 Harbor 传入同一份 agent 出网域名列表，取自当前模型端点。
 
 **中断与接管(任何 agent/机器都适用):**
 
@@ -73,7 +84,7 @@ driver 自动:二进制新鲜度校验 → GLM 余额 preflight → 生成三格
 - **驱动/机器也断了**(WSL 重启、断电、脚本失败):重新执行上面两步(Windows 重建二进制 → WSL setsid 重启 driver)即可。**driver 支持断点续跑**:已完成的格子自动跳过;跑了一半的格子只把"没有 result.json 的题"放到新 job(xcode-v2、v3…)里续跑,已完成的 trial 原样保留、绝不重跑。分析时按格子合并全部 xcode-v* 目录。
 - **续跑前唯一要人工确认的**:先 `tail` 各格 console.log 看中断原因——若是 GLM 余额耗尽这类会复现的问题,先解决再续跑,否则续跑的格子会全程降级。
 
-**铁律:不重跑、不删除、失败留盘。** 失败的格子照样留在 `.eval/ablation/` 里,分析时归类为基础设施失败。绝对不允许挑着重跑"好看"的结果——这是课程项目,数据必须真实。另外 `prepare_ablation.py` 拒绝覆盖已存在的格子目录,所以只有在**还没跑过任何东西**的前提下才允许手动删掉重来。
+**铁律：不重跑已完成的题、不删除记录、失败原样留盘。** 发现可能影响数据有效性的问题时报告用户，由用户决定如何归类。`prepare_ablation.py` 只校验已有格子目录。准备状态不完整或清单与当前配置不符时，停下来报告。
 
 ### 2. 消融结果分析 + 报告
 

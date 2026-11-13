@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "py-bug-mutable-default",
+  "language": "python",
+  "kind": "bugfix",
+  "prompt": "solution.py keeps state between unrelated calls because a mutable default is shared. Fix `collect` in solution.py so results no longer leak between calls, while still appending into an explicitly supplied target list.",
+  "acceptance": [
+    "no state leaks between calls that use the default",
+    "an explicit target list is still filled in place"
+  ],
+  "tags": [
+    "bugfix",
+    "python-semantics"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

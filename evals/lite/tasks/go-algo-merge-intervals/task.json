@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "go-algo-merge-intervals",
+  "language": "go",
+  "kind": "algo",
+  "prompt": "Implement Merge in solution.go: given closed integer intervals as [][]int in any order, return them merged and sorted by start. Overlapping and touching intervals merge into one. Do not modify the caller's input slices.",
+  "acceptance": [
+    "overlapping and touching intervals merge",
+    "output is sorted by start and the input is left unchanged"
+  ],
+  "tags": [
+    "algorithm",
+    "intervals"
+  ],
+  "verify_commands": [
+    [
+      "go",
+      "test",
+      "./..."
+    ]
+  ],
+  "hidden_command": [
+    [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ]
+  ]
+}

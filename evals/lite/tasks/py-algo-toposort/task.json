@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-algo-toposort",
+  "language": "python",
+  "kind": "algo",
+  "prompt": "Implement `topological_order(nodes, edges)` in solution.py. Return a list ordering every node so that each edge (source, target) puts source first; break ties by choosing the alphabetically smallest available node. Return None when the graph has a cycle. Raise ValueError when an edge names an unknown node.",
+  "acceptance": [
+    "every edge is respected in the returned order",
+    "ties are broken by node name",
+    "cycles return None; unknown nodes raise ValueError"
+  ],
+  "tags": [
+    "algorithm",
+    "graph"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

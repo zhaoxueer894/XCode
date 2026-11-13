@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-mod-token-bucket",
+  "language": "python",
+  "kind": "module",
+  "prompt": "Implement `TokenBucket(rate, capacity, clock)` in solution.py. The bucket starts full and refills at `rate` tokens per second according to the injected clock, never exceeding `capacity`. allow(count) removes count tokens and returns True when enough are available, otherwise leaves the bucket untouched and returns False. tokens() reports the current level. Raise ValueError for a non-positive rate or capacity, or a count below one.",
+  "acceptance": [
+    "refill is proportional to elapsed time and capped at capacity",
+    "a refused request consumes nothing",
+    "invalid parameters raise ValueError"
+  ],
+  "tags": [
+    "module",
+    "rate-limiting"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

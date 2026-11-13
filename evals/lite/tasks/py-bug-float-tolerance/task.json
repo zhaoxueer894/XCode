@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "py-bug-float-tolerance",
+  "language": "python",
+  "kind": "bugfix",
+  "prompt": "solution.py compares floats with a strict inequality, so a difference exactly equal to the tolerance is reported as different. Fix `nearly_equal` in solution.py so the boundary counts as equal.",
+  "acceptance": [
+    "a difference of exactly the tolerance is equal",
+    "a difference just above the tolerance is not equal"
+  ],
+  "tags": [
+    "bugfix",
+    "floating-point"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

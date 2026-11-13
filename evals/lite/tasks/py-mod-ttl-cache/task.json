@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-mod-ttl-cache",
+  "language": "python",
+  "kind": "module",
+  "prompt": "Implement `TTLCache(capacity, ttl, clock)` in solution.py. set(key, value) stores a value that expires ttl seconds later (per the injected clock); get(key, default) returns it, or default when missing or expired. When a set exceeds capacity, evict the least recently used entry, counting both get and set as use. len() counts only live entries. Raise ValueError for a non-positive capacity or ttl.",
+  "acceptance": [
+    "expired entries read as missing and are dropped",
+    "capacity eviction is least-recently-used and reads refresh recency",
+    "re-setting a key refreshes its expiry"
+  ],
+  "tags": [
+    "module",
+    "cache"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

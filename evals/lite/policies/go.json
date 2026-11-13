@@ -1,0 +1,32 @@
+{
+  "rules": [
+    {
+      "id": "go-test",
+      "tool": "exec",
+      "command_prefix": ["go", "test"],
+      "decision": "allow",
+      "reason": "Run the task's own package tests unattended."
+    },
+    {
+      "id": "go-build",
+      "tool": "exec",
+      "command_prefix": ["go", "build"],
+      "decision": "allow",
+      "reason": "Compile the package to surface type errors."
+    },
+    {
+      "id": "go-vet",
+      "tool": "exec",
+      "command_prefix": ["go", "vet"],
+      "decision": "allow",
+      "reason": "Run the standard static checks."
+    },
+    {
+      "id": "go-run",
+      "tool": "exec",
+      "command_prefix": ["go", "run"],
+      "decision": "allow",
+      "reason": "Run a small program in the workspace."
+    }
+  ]
+}

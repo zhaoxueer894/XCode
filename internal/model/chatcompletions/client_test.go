@@ -106,6 +106,164 @@ func TestGenerateNormalizesTextUsageAndFinish(t *testing.T) {
 	}
 }
 
+func TestDeepSeekPlannerHandoffUsesJSONAndRecoversFromToolMarkup(t *testing.T) {
+	const plan = "Inspect numeric comparison overrides and test both operand orders."
+	for _, test := range []struct {
+		name      string
+		malformed bool
+	}{
+		{name: "first handoff"},
+		{name: "corrected handoff", malformed: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			transport := roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				calls++
+				var body chatRequest
+				if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.ToolChoice != "none" || len(body.Tools) != 0 ||
+					body.ResponseFormat == nil || body.ResponseFormat.Type != "json_object" {
+					t.Fatalf("expected a tool-free JSON request, got %+v", body)
+				}
+				last := body.Messages[len(body.Messages)-1]
+				if last.Role != "user" || !strings.Contains(last.Content, `{"handoff":`) {
+					t.Fatalf("missing JSON format instruction: %+v", last)
+				}
+				content := `{"handoff":"` + plan + `"}`
+				if test.malformed && calls == 1 {
+					content = `<｜｜DSML｜｜ calls><｜｜DSML｜｜ invoke name="exec"></｜｜DSML｜｜ invoke></｜｜DSML｜｜ calls>`
+				}
+				chunk, _ := json.Marshal(map[string]any{
+					"choices": []map[string]any{{"index": 0, "delta": map[string]string{"content": content}}},
+				})
+				return sseResponse(string(chunk), `{"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`), nil
+			})
+			client, err := New(Config{BaseURL: "https://example.com", APIKey: testAPIKey, Model: "deepseek-flash",
+				Provider: "deepseek", HTTPClient: &http.Client{Transport: transport}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			budget := harness.NewStagedModelBudget(10, 0, true, nil)
+			registry, err := harness.NewRegistry()
+			if err != nil {
+				t.Fatal(err)
+			}
+			agent := harness.NewAgent(budget.Wrap(client, "sub:planner"), registry, 3, nil)
+			result, err := agent.RunWithOptions(t.Context(), "Diagnose the comparison issue.", harness.RunOptions{
+				WorkerHandoff: func(_ context.Context, text string) error {
+					if text != plan {
+						t.Fatalf("handoff validator got %q, want %q", text, plan)
+					}
+					return nil
+				},
+				WorkerCorrectionTextOnly: true,
+			})
+			wantCalls := 1
+			if test.malformed {
+				wantCalls++
+			}
+			if err != nil || result.Answer != plan || calls != wantCalls {
+				t.Fatalf("answer=%q calls=%d, want %d, err=%v", result.Answer, calls, wantCalls, err)
+			}
+		})
+	}
+}
+
+func TestDeepSeekSubmissionCorrectionUsesOnlyJSONPatch(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		content    string
+		valid      bool
+		nativeCall bool
+	}{
+		{name: "valid patch", content: `{"path":"demo.txt","operation":"update","old_string":"red","new_string":"blue"}`, valid: true},
+		{name: "historical tool echoed as text", content: `<｜｜DSML｜｜ invoke name="read_file">`},
+		{name: "unexpected command object", content: `{"command":["read_file","demo.txt"]}`},
+		{name: "historical tool returned as a native call", nativeCall: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			transport := roundTripFunc(func(request *http.Request) (*http.Response, error) {
+				var body chatRequest
+				if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				if body.ToolChoice != "none" || len(body.Tools) != 0 || body.Thinking == nil || body.Thinking.Type != "disabled" ||
+					body.ResponseFormat == nil || body.ResponseFormat.Type != "json_object" {
+					t.Fatalf("correction sent unexpected request options: %+v", body)
+				}
+				last := body.Messages[len(body.Messages)-1]
+				if last.Role != "user" || !strings.Contains(last.Content, "demo.txt contains red") ||
+					!strings.Contains(last.Content, "Change red to blue.") {
+					t.Fatalf("task or tool observation was lost: %+v", last)
+				}
+				for _, message := range body.Messages {
+					if message.Role == "tool" || len(message.ToolCalls) > 0 || message.ToolCallID != "" || message.ReasoningContent != "" {
+						t.Fatalf("old tool protocol leaked into correction: %+v", message)
+					}
+				}
+				if test.nativeCall {
+					return sseResponse(
+						`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"unexpected","type":"function","function":{"name":"read_file","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`,
+					), nil
+				}
+				chunk, _ := json.Marshal(map[string]any{
+					"choices": []map[string]any{{"index": 0, "delta": map[string]string{"content": test.content}}},
+				})
+				return sseResponse(string(chunk), `{"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`), nil
+			})
+			client, err := New(Config{BaseURL: "https://example.com", APIKey: testAPIKey, Model: "deepseek-flash",
+				Provider: "deepseek", Thinking: "enabled", ReasoningEffort: "high", HTTPClient: &http.Client{Transport: transport}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			edit := &submissionTool{name: "apply_patch"}
+			verify := &submissionTool{name: "exec"}
+			registry, err := harness.NewRegistry(edit, verify)
+			if err != nil {
+				t.Fatal(err)
+			}
+			budget := harness.NewFunctionalModelBudget(2, 0, "single-review", nil)
+			agent := harness.NewAgent(budget.Wrap(client, "agent"), registry, 3, nil)
+			_, err = agent.RunTurn(t.Context(), []harness.Message{
+				{Role: "user", Content: "Change red to blue."},
+				{Role: "assistant", ReasoningContent: "old reasoning", ToolCalls: []harness.ToolCall{
+					{ID: "read", Name: "read_file", Arguments: json.RawMessage(`{"path":"demo.txt"}`)},
+				}},
+				{Role: "tool", ToolCallID: "read", Content: "demo.txt contains red"},
+			}, harness.RunOptions{
+				Orchestrate: "single-review",
+				Contract: &harness.TaskContract{
+					Goal: "Change red to blue.", VerifyCommands: []harness.VerifyCommand{{Name: "test", Command: []string{"test"}}},
+				},
+				WorkspaceFingerprint: func() (string, error) { return "fp", nil },
+				CandidatePatch:       func(context.Context) (bool, error) { return len(edit.args) > 0, nil },
+				FunctionalRepair:     func(context.Context, string) error { t.Fatal("unexpected repair"); return nil },
+			})
+			if test.valid {
+				if err != nil || string(edit.args) != test.content || len(verify.args) == 0 {
+					t.Fatalf("patch was not applied and verified: err=%v patch=%s verify=%s", err, edit.args, verify.args)
+				}
+			} else if !errors.Is(err, harness.ErrIncompleteModelResponse) || len(edit.args) != 0 || len(verify.args) != 0 {
+				t.Fatalf("invalid response reached the executor: err=%v patch=%s verify=%s", err, edit.args, verify.args)
+			}
+		})
+	}
+}
+
+type submissionTool struct {
+	name string
+	args json.RawMessage
+}
+
+func (t *submissionTool) Spec() harness.ToolSpec { return harness.ToolSpec{Name: t.name} }
+
+func (t *submissionTool) Execute(_ context.Context, args json.RawMessage) (harness.ToolResult, error) {
+	t.args = args
+	return harness.ToolResult{Observation: "command=test exit_code=0 duration_ms=1"}, nil
+}
+
 // TestGenerateAssemblesToolCallDeltas 验证分散在多个 chunk 中的参数能组合成完整工具调用。
 func TestGenerateAssemblesToolCallDeltas(t *testing.T) {
 	transport := staticSSETransport(

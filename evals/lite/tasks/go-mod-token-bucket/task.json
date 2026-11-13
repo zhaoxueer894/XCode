@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "go-mod-token-bucket",
+  "language": "go",
+  "kind": "module",
+  "prompt": "Implement TokenBucket in solution.go: NewTokenBucket(rate, capacity, clock) starts full and returns ErrParameter for a non-positive rate or capacity. Allow(count) refills proportionally to elapsed clock time (capped at capacity), removes count tokens when available and reports success, otherwise changes nothing; a count below one returns ErrParameter. Tokens reports the current level.",
+  "acceptance": [
+    "refill is proportional to elapsed time and capped at capacity",
+    "a refused request consumes nothing",
+    "invalid parameters return ErrParameter"
+  ],
+  "tags": [
+    "module",
+    "rate-limiting"
+  ],
+  "verify_commands": [
+    [
+      "go",
+      "test",
+      "./..."
+    ]
+  ],
+  "hidden_command": [
+    [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ]
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "py-bug-group-by",
+  "language": "python",
+  "kind": "bugfix",
+  "prompt": "solution.py groups rows by amount but keeps only the last row of each group. Fix `group_by_amount` in solution.py so every row is kept, preserving first-seen group order and input order within a group.",
+  "acceptance": [
+    "every row of a group is retained in input order",
+    "the result is keyed by amount"
+  ],
+  "tags": [
+    "bugfix",
+    "aggregation"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

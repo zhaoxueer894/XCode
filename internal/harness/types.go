@@ -87,11 +87,12 @@ func (f ModelEventSinkFunc) EmitModelEvent(event ModelEvent) {
 
 // 一次模型调用的归一化结果：可以返回Content ｜ ToolCalls调用
 type ModelResponse struct {
-	ReasoningContent string
-	Content          string     // 文本
-	ToolCalls        []ToolCall // 工具调用列表
-	Usage            Usage      // 本次请求最终 Token 用量。
-	FinishReason     string     // Provider 返回的停止原因。
+	ReasoningContent  string
+	Content           string     // 文本
+	ToolCalls         []ToolCall // 工具调用列表
+	Usage             Usage      // 本次请求最终 Token 用量。
+	FinishReason      string     // Provider 返回的停止原因。
+	WithheldToolCalls bool       // tools removed by budget enforcement
 }
 
 // Model接口： 隔离不同模型供应商协议差异，实现Generate方法
@@ -149,9 +150,14 @@ const (
 
 // 完成门禁事件：门禁拒绝或放行模型的完成声明。
 const (
-	CompletionGateBlocked EventKind = "completion.gate.blocked" // 门禁拒绝完成声明；data 保存阻塞原因。
-	CompletionGatePassed  EventKind = "completion.gate.passed"  // 门禁放行；data 保存当时的工作区指纹。
-	ReviewDegraded        EventKind = "review.degraded"         // cross-model review degraded to the developer model; never silent
+	CompletionGateBlocked    EventKind = "completion.gate.blocked" // 门禁拒绝完成声明；data 保存阻塞原因。
+	CompletionGatePassed     EventKind = "completion.gate.passed"  // 门禁放行；data 保存当时的工作区指纹。
+	ReviewDegraded           EventKind = "review.degraded"         // cross-model review degraded to the developer model; never silent
+	ReviewVerdict            EventKind = "review.verdict"          // reviewer delivered a valid verdict, independent of gate acceptance
+	FunctionalVerification   EventKind = "functional.verification"
+	FunctionalRepairStarted  EventKind = "functional.repair.started"
+	FunctionalRepairFinished EventKind = "functional.repair.finished"
+	StageOutputInvalid       EventKind = "stage.output.invalid" // a worker handoff failed validation
 )
 
 // 多智能体生命周期事件。

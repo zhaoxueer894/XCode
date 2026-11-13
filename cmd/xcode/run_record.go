@@ -41,40 +41,44 @@ type runRecord struct {
 // ReviewerRecord captures the cross-model reviewer configuration and any
 // degradation; unconfigured or runtime fallbacks are recorded, never silent.
 type ReviewerRecord struct {
-	Configured bool   `json:"configured"`
-	Provider   string `json:"provider,omitempty"`
-	Model      string `json:"model,omitempty"`
-	Degraded   bool   `json:"degraded"`
-	Reason     string `json:"reason,omitempty"`
+	StageBudget     bool   `json:"stage_budget,omitempty"`
+	StrictMaxSteps  int    `json:"strict_max_steps,omitempty"`
+	MaxOutputTokens int    `json:"max_output_tokens,omitempty"`
+	Configured      bool   `json:"configured"`
+	Provider        string `json:"provider,omitempty"`
+	Model           string `json:"model,omitempty"`
+	Degraded        bool   `json:"degraded"`
+	Reason          string `json:"reason,omitempty"`
 }
 
 type runRecordConfig struct {
-	Workspace       string `json:"workspace"`
-	Provider        string `json:"provider"`
-	Model           string `json:"model"`
-	Endpoint        string `json:"endpoint,omitempty"`
-	Mode            string `json:"mode"`
-	Sandbox         string `json:"sandbox"`
-	SandboxImage    string `json:"sandbox_image"`
-	ContextStrategy string `json:"context_strategy"`
-	ContextBudget   int    `json:"context_budget"`
-	MaxSteps        int    `json:"max_steps"`
-	MaxTokens       int    `json:"max_tokens"`
-	MaxModelCalls   int    `json:"max_model_calls"`
-	ProviderRetries int    `json:"provider_retries"`
-	Thinking        string `json:"thinking,omitempty"`
-	ReasoningEffort string `json:"reasoning_effort,omitempty"`
-	MaxOutputTokens int    `json:"max_output_tokens,omitempty"`
-	DoomLoopLimit   int    `json:"doom_loop_limit"`
-	Timeout         string `json:"timeout"`
-	NoDelegate      bool   `json:"no_delegate"`
-	NonInteractive  bool   `json:"non_interactive"`
-	Isolated        bool   `json:"isolated"`
-	ContractHash    string `json:"contract_hash,omitempty"`
-	PolicyHash      string `json:"policy_hash,omitempty"`
-	PreludeHash     string `json:"prelude_hash,omitempty"`
-	Platform        string `json:"platform"`
-	GoVersion       string `json:"go_version"`
+	Workspace            string `json:"workspace"`
+	Provider             string `json:"provider"`
+	Model                string `json:"model"`
+	Endpoint             string `json:"endpoint,omitempty"`
+	Mode                 string `json:"mode"`
+	Sandbox              string `json:"sandbox"`
+	SandboxImage         string `json:"sandbox_image"`
+	ContextStrategy      string `json:"context_strategy"`
+	ContextBudget        int    `json:"context_budget"`
+	MaxSteps             int    `json:"max_steps"`
+	MaxTokens            int    `json:"max_tokens"`
+	MaxModelCalls        int    `json:"max_model_calls"`
+	ProviderRetries      int    `json:"provider_retries"`
+	Thinking             string `json:"thinking,omitempty"`
+	ReasoningEffort      string `json:"reasoning_effort,omitempty"`
+	MaxOutputTokens      int    `json:"max_output_tokens,omitempty"`
+	DoomLoopLimit        int    `json:"doom_loop_limit"`
+	Timeout              string `json:"timeout"`
+	NoDelegate           bool   `json:"no_delegate"`
+	NonInteractive       bool   `json:"non_interactive"`
+	Isolated             bool   `json:"isolated"`
+	ContractHash         string `json:"contract_hash,omitempty"`
+	FunctionalRepairOnce bool   `json:"functional_repair_once,omitempty"`
+	PolicyHash           string `json:"policy_hash,omitempty"`
+	PreludeHash          string `json:"prelude_hash,omitempty"`
+	Platform             string `json:"platform"`
+	GoVersion            string `json:"go_version"`
 }
 
 func newRunRecord(config runRecordConfig) *runRecord {

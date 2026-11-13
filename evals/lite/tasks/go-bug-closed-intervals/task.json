@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "go-bug-closed-intervals",
+  "language": "go",
+  "kind": "bugfix",
+  "prompt": "solution.go treats closed intervals as half-open, so intervals that merely share an endpoint are reported as disjoint. Fix Overlaps in solution.go so two closed intervals sharing any integer, including a single endpoint, overlap.",
+  "acceptance": [
+    "intervals sharing an endpoint overlap",
+    "separated and contained intervals are classified correctly"
+  ],
+  "tags": [
+    "bugfix",
+    "boundary"
+  ],
+  "verify_commands": [
+    [
+      "go",
+      "test",
+      "./..."
+    ]
+  ],
+  "hidden_command": [
+    [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ]
+  ]
+}

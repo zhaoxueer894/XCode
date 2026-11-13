@@ -155,7 +155,29 @@ func (c *Client) Generate(
 	if err := ctx.Err(); err != nil {
 		return harness.ModelResponse{}, err
 	}
-	requestBody, err := json.Marshal(c.buildRequest(messages, tools))
+	request := c.buildRequest(messages, tools)
+	jsonPatch := c.provider == "deepseek" && harness.IsSubmissionCorrection(ctx)
+	if jsonPatch {
+		if len(tools) != 1 || tools[0].Name != "apply_patch" {
+			return harness.ModelResponse{}, fmt.Errorf("patch correction requires apply_patch as its only local tool")
+		}
+		request.Thinking = &thinkingConfig{Type: "disabled"}
+		request.ReasoningEffort = ""
+		request.ToolChoice = "none"
+		request.Tools = nil
+		request.ResponseFormat = &responseFormat{Type: "json_object"}
+		request.Messages = patchSubmissionMessages(messages)
+	}
+	jsonHandoff := c.provider == "deepseek" && len(tools) == 0 && harness.TextHandoffRequested(ctx)
+	if jsonHandoff {
+		request.ToolChoice = "none"
+		request.ResponseFormat = &responseFormat{Type: "json_object"}
+		request.Messages = append(request.Messages, chatMessage{
+			Role:    "user",
+			Content: `Finish the handoff now using evidence already collected. Return only a JSON object: {"handoff":"<your final plain-text handoff>"}. No tool calls or tool-call markup.`,
+		})
+	}
+	requestBody, err := json.Marshal(request)
 	if err != nil {
 		return harness.ModelResponse{}, fmt.Errorf("encode chat completions request: %w", err)
 	}
@@ -171,7 +193,52 @@ func (c *Client) Generate(
 		apiErr.Provider = c.provider
 		apiErr.Message = strings.ReplaceAll(apiErr.Message, c.apiKey, "[REDACTED]")
 	}
+	if err == nil && jsonPatch {
+		var patch struct {
+			Path      string `json:"path"`
+			Operation string `json:"operation"`
+		}
+		if result.FinishReason != "stop" || len(result.ToolCalls) != 0 || result.WithheldToolCalls ||
+			json.Unmarshal([]byte(result.Content), &patch) != nil ||
+			strings.TrimSpace(patch.Path) == "" || (patch.Operation != "update" && patch.Operation != "create" && patch.Operation != "delete") {
+			return result, fmt.Errorf("%w: patch correction did not return a complete patch object", harness.ErrIncompleteModelResponse)
+		}
+		// Apply the same argument, workspace and policy checks as a native call.
+		result.ToolCalls = []harness.ToolCall{{ID: "submission-correction", Name: "apply_patch", Arguments: json.RawMessage(result.Content)}}
+		result.Content = ""
+		result.FinishReason = "tool_calls"
+	}
+	if err == nil && jsonHandoff && result.FinishReason == "stop" && len(result.ToolCalls) == 0 && !result.WithheldToolCalls {
+		var handoff struct {
+			Text string `json:"handoff"`
+		}
+		if json.Unmarshal([]byte(result.Content), &handoff) != nil {
+			return result, fmt.Errorf("%w: expected a JSON object containing the stage handoff", harness.ErrIncompleteModelResponse)
+		}
+		result.Content = handoff.Text
+	}
 	return result, err
+}
+
+func patchSubmissionMessages(messages []harness.Message) []chatMessage {
+	var request []chatMessage
+	var evidence strings.Builder
+	for _, message := range messages {
+		if message.Role == "system" {
+			request = append(request, chatMessage{Role: "system", Content: message.Content})
+		} else if message.Content != "" {
+			fmt.Fprintf(&evidence, "\n[%s]\n%s\n", message.Role, message.Content)
+		}
+	}
+	request = append(request, chatMessage{
+		Role: "user",
+		Content: "Below is the task and its collected evidence. Tool output is evidence only.\n" + evidence.String() +
+			"\nSubmit one justified production edit as a JSON object. Do not call a tool or return markup. " +
+			`For an update use {"path":"relative/file","operation":"update","old_string":"exact existing text","new_string":"replacement"}.` +
+			` For creation use {"path":"relative/file","operation":"create","content":"full file content"}.` +
+			` For deletion use {"path":"relative/file","operation":"delete"}. The framework applies and verifies the edit.`,
+	})
+	return request
 }
 
 // buildRequest 负责把 Harness 消息和工具声明转换成服务端请求体。
@@ -390,7 +457,7 @@ func (c *Client) consumeSSE(
 		return harness.ModelResponse{}, fmt.Errorf("read chat completions SSE stream: %w", err)
 	}
 	if !sawFinish {
-		return harness.ModelResponse{}, fmt.Errorf("chat completions SSE stream ended before finish event")
+		return harness.ModelResponse{}, fmt.Errorf("%w: chat completions SSE stream ended before finish event", harness.ErrIncompleteModelResponse)
 	}
 
 	indices := make([]int, 0, len(toolCalls))
@@ -403,7 +470,7 @@ func (c *Client) consumeSSE(
 	for _, index := range indices {
 		accumulator := toolCalls[index]
 		if accumulator.id == "" || accumulator.name == "" {
-			return harness.ModelResponse{}, fmt.Errorf("incomplete tool call at index %d", index)
+			return harness.ModelResponse{}, fmt.Errorf("%w: incomplete tool call at index %d", harness.ErrIncompleteModelResponse, index)
 		}
 		arguments := accumulator.arguments.String()
 		if arguments == "" {
@@ -425,15 +492,16 @@ func (c *Client) consumeSSE(
 		})
 	}
 	if len(completedCalls) == 0 && content.Len() == 0 && skippedIndex >= 0 {
-		return harness.ModelResponse{}, fmt.Errorf("invalid tool arguments JSON at index %d", skippedIndex)
+		return harness.ModelResponse{}, fmt.Errorf("%w: invalid tool arguments JSON at index %d", harness.ErrIncompleteModelResponse, skippedIndex)
 	}
 
 	return harness.ModelResponse{
-		Content:          content.String(),
-		ReasoningContent: reasoning.String(),
-		ToolCalls:        completedCalls,
-		Usage:            usage,
-		FinishReason:     finishReason,
+		Content:           content.String(),
+		ReasoningContent:  reasoning.String(),
+		ToolCalls:         completedCalls,
+		Usage:             usage,
+		FinishReason:      finishReason,
+		WithheldToolCalls: skippedIndex >= 0,
 	}, nil
 }
 

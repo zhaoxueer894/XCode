@@ -42,6 +42,141 @@ func TestSharedBudgetCountsWorkersAndSummariesOnce(t *testing.T) {
 	}
 }
 
+func TestStagedBudgetReservesRequestsAndClosesPlannerOnlyOnce(t *testing.T) {
+	ctx := context.Background()
+	budget := harness.NewStagedModelBudget(20, 20000, true, nil)
+	var toolsPerCall []int
+	model := modelFunc(func(_ context.Context, _ []harness.Message, tools []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+		toolsPerCall = append(toolsPerCall, len(tools))
+		reply := harness.ModelResponse{Content: "done", Usage: harness.Usage{TotalTokens: 1000}}
+		switch len(toolsPerCall) {
+		case 1, 2:
+			reply.ToolCalls = []harness.ToolCall{{ID: fmt.Sprint(len(toolsPerCall)), Name: "read_file",
+				Arguments: json.RawMessage(fmt.Sprintf(`{"path":"file%d.go"}`, len(toolsPerCall)))}}
+		case 3:
+			reply.Content = ""
+			reply.FinishReason = "tool_calls"
+			reply.ToolCalls = []harness.ToolCall{{ID: "withheld", Name: "read_file"}}
+		}
+		return reply, nil
+	})
+	tools := []harness.ToolSpec{{Name: "read_file"}}
+	reader := &gateStubTool{name: "read_file", observations: []string{"evidence"}}
+	registry, _ := harness.NewRegistry(reader)
+	worker := harness.NewAgent(budget.Wrap(model, "sub:planner"), registry, 5, nil)
+	_, err := worker.RunWithOptions(ctx, "plan", harness.RunOptions{WorkerHandoff: func(_ context.Context, text string) error {
+		if text == "done" {
+			return nil
+		}
+		return fmt.Errorf("missing plan")
+	}})
+	if err != nil || reader.Calls() != 2 {
+		t.Fatalf("planner correction did not preserve earlier tools: %v, calls=%d", err, reader.Calls())
+	}
+	if _, err := budget.Wrap(model, "sub:planner").Generate(ctx, nil, tools, nil); !errors.Is(err, harness.ErrBudget) {
+		t.Fatalf("repeat delegation got %v, want ErrBudget", err)
+	}
+	if _, err := budget.Wrap(model, "sub:reviewer").Generate(ctx, nil, tools, nil); err != nil {
+		t.Fatalf("planner exhausted reviewer allowance: %v", err)
+	}
+	if fmt.Sprint(toolsPerCall) != "[1 1 0 0 1]" {
+		t.Fatalf("advertised tools per call = %v", toolsPerCall)
+	}
+}
+
+func TestStagedPlannerLeavesCorrectionAfterLargeToolResults(t *testing.T) {
+	costs := []int{2307, 3121, 4581, 7933, 8691, 7934, 8003}
+	reader := &gateStubTool{name: "read_file", observations: []string{"evidence"}}
+	registry, _ := harness.NewRegistry(reader)
+	calls := 0
+	model := modelFunc(func(_ context.Context, _ []harness.Message, tools []harness.ToolSpec, _ harness.ModelEventSink) (harness.ModelResponse, error) {
+		calls++
+		response := harness.ModelResponse{Usage: harness.Usage{TotalTokens: costs[calls-1]}}
+		if calls <= 5 {
+			response.ToolCalls = []harness.ToolCall{{ID: fmt.Sprint(calls), Name: "read_file",
+				Arguments: json.RawMessage(fmt.Sprintf(`{"path":"file%d.go"}`, calls))}}
+		} else if len(tools) != 0 {
+			t.Fatal("planner should close early enough to fund its correction")
+		} else if calls == 7 {
+			response.Content = "Inspect the comparator and fix unknown operands."
+		}
+		return response, nil
+	})
+	budget := harness.NewStagedModelBudget(100, 200000, true, nil)
+	result, err := harness.NewAgent(budget.Wrap(model, "sub:planner"), registry, 8, nil).
+		RunWithOptions(context.Background(), "diagnose", harness.RunOptions{
+			WorkerHandoff: func(_ context.Context, text string) error {
+				if text == "" {
+					return fmt.Errorf("empty handoff")
+				}
+				return nil
+			},
+		})
+	if err != nil || result.StopReason != harness.StopCompleted || calls != 7 || reader.Calls() != 5 {
+		t.Fatalf("result=%+v, calls=%d, executed tools=%d, err=%v", result, calls, reader.Calls(), err)
+	}
+}
+
+func TestFunctionalRepairReserveCannotBeSpentByFirstSubmission(t *testing.T) {
+	for _, test := range []struct {
+		mode     string
+		purposes []string
+	}{
+		{"single", []string{"agent"}},
+		{"single-review", []string{"agent", "sub:reviewer"}},
+		{"pipeline", []string{"agent", "sub:planner", "sub:developer", "sub:reviewer"}},
+	} {
+		t.Run(test.mode, func(t *testing.T) {
+			b := harness.NewFunctionalModelBudget(100, 200000, test.mode, nil)
+			model := modelFunc(func(context.Context, []harness.Message, []harness.ToolSpec, harness.ModelEventSink) (harness.ModelResponse, error) {
+				return harness.ModelResponse{Content: "done", Usage: harness.Usage{TotalTokens: 5000}}, nil
+			})
+			for _, purpose := range test.purposes {
+				for {
+					_, err := b.Wrap(model, purpose).Generate(t.Context(), nil, nil, nil)
+					if errors.Is(err, harness.ErrBudget) {
+						break
+					}
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if spent := b.Snapshot().Usage.TotalTokens; spent > 150000 {
+				t.Fatalf("initial stages spent %d tokens, leaving less than the repair reserve", spent)
+			}
+			if _, err := b.Wrap(model, "repair").Generate(t.Context(), nil, nil, nil); err != nil {
+				t.Fatalf("first submission consumed the repair allocation: %v", err)
+			}
+		})
+	}
+}
+
+func TestFunctionalRepairReserveKeepsTenModelRequests(t *testing.T) {
+	budget := harness.NewFunctionalModelBudget(100, 200000, "single", nil)
+	model := modelFunc(func(context.Context, []harness.Message, []harness.ToolSpec, harness.ModelEventSink) (harness.ModelResponse, error) {
+		return harness.ModelResponse{Content: "done", Usage: harness.Usage{TotalTokens: 100}}, nil
+	})
+	initial := budget.Wrap(model, "agent")
+	repair := budget.Wrap(model, "repair")
+	for i := 0; i < 90; i++ {
+		if _, err := initial.Generate(t.Context(), nil, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := initial.Generate(t.Context(), nil, nil, nil); !errors.Is(err, harness.ErrBudget) {
+		t.Fatalf("initial stage entered the repair reserve: %v", err)
+	}
+	for i := 0; i < 10; i++ {
+		if _, err := repair.Generate(t.Context(), nil, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := repair.Generate(t.Context(), nil, nil, nil); !errors.Is(err, harness.ErrBudget) {
+		t.Fatalf("repair exceeded its request allocation: %v", err)
+	}
+}
+
 func TestBudgetGuidanceDistinguishesExplorationTestsAndProductionEdits(t *testing.T) {
 	registry, err := harness.NewRegistry(staticTool{name: "read_file", output: "evidence"}, staticTool{name: "apply_patch", output: "updated"})
 	if err != nil {

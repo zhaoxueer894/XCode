@@ -1,0 +1,402 @@
+{
+  "source": "Multi-SWE-bench manual annotation xlsx (go/js/ts) + SWE-bench Verified difficulty field",
+  "buckets": [
+    "<15 min",
+    "15 min - 1 hour",
+    "1-4 hours",
+    ">4 hours"
+  ],
+  "notes": [
+    "MSB JS instances carry two independent annotator ratings; both are kept and the consensus is the median bucket.",
+    "Labels are a dataset property frozen before any model run, not a post-hoc judgement of model behaviour."
+  ],
+  "tasks": [
+    {
+      "round": "round 1",
+      "id": "zeromicro__go-zero-2537",
+      "language": "go",
+      "repository": "zeromicro/go-zero",
+      "f2p_count": 1,
+      "p2p_count": 1382,
+      "difficulty_ratings": [
+        "1-4 hours"
+      ],
+      "difficulty_consensus": "1-4 hours",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 1",
+      "id": "expressjs__express-3870",
+      "language": "javascript",
+      "repository": "expressjs/express",
+      "f2p_count": 1,
+      "p2p_count": 851,
+      "difficulty_ratings": [
+        "<15 min",
+        "1-4 hours"
+      ],
+      "difficulty_consensus": "1-4 hours",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 1",
+      "id": "cli__cli-278",
+      "language": "go",
+      "repository": "cli/cli",
+      "f2p_count": 2,
+      "p2p_count": 87,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 1",
+      "id": "iamkun__dayjs-318",
+      "language": "javascript",
+      "repository": "iamkun/dayjs",
+      "f2p_count": 1,
+      "p2p_count": 14,
+      "difficulty_ratings": [
+        "1-4 hours",
+        "15 min - 1 hour"
+      ],
+      "difficulty_consensus": "1-4 hours",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 1",
+      "id": "sympy__sympy-11618",
+      "language": "python",
+      "repository": "sympy/sympy",
+      "f2p_count": 1,
+      "p2p_count": 4,
+      "difficulty_ratings": [
+        "15 min - 1 hour"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "verified"
+    },
+    {
+      "round": "round 1",
+      "id": "expressjs__express-5555",
+      "language": "javascript",
+      "repository": "expressjs/express",
+      "f2p_count": 1,
+      "p2p_count": 678,
+      "difficulty_ratings": [
+        "<15 min",
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 1",
+      "id": "cli__cli-302",
+      "language": "go",
+      "repository": "cli/cli",
+      "f2p_count": 9,
+      "p2p_count": 80,
+      "difficulty_ratings": [
+        "15 min - 1 hour"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 1",
+      "id": "iamkun__dayjs-337",
+      "language": "javascript",
+      "repository": "iamkun/dayjs",
+      "f2p_count": 1,
+      "p2p_count": 18,
+      "difficulty_ratings": [
+        "15 min - 1 hour",
+        "<15 min"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 1",
+      "id": "sympy__sympy-12096",
+      "language": "python",
+      "repository": "sympy/sympy",
+      "f2p_count": 1,
+      "p2p_count": 43,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "verified"
+    },
+    {
+      "round": "round 2",
+      "id": "cli__cli-352",
+      "language": "go",
+      "repository": "cli/cli",
+      "f2p_count": 1,
+      "p2p_count": 126,
+      "difficulty_ratings": [
+        "15 min - 1 hour"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 2",
+      "id": "iamkun__dayjs-379",
+      "language": "javascript",
+      "repository": "iamkun/dayjs",
+      "f2p_count": 1,
+      "p2p_count": 22,
+      "difficulty_ratings": [
+        "15 min - 1 hour",
+        "15 min - 1 hour"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 2",
+      "id": "sympy__sympy-12419",
+      "language": "python",
+      "repository": "sympy/sympy",
+      "f2p_count": 1,
+      "p2p_count": 25,
+      "difficulty_ratings": [
+        "15 min - 1 hour"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "verified"
+    },
+    {
+      "round": "round 2",
+      "id": "django__django-9296",
+      "language": "python",
+      "repository": "django/django",
+      "f2p_count": 1,
+      "p2p_count": 20,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "verified"
+    },
+    {
+      "round": "round 2",
+      "id": "cli__cli-362",
+      "language": "go",
+      "repository": "cli/cli",
+      "f2p_count": 1,
+      "p2p_count": 87,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 2",
+      "id": "iamkun__dayjs-556",
+      "language": "javascript",
+      "repository": "iamkun/dayjs",
+      "f2p_count": 2,
+      "p2p_count": 35,
+      "difficulty_ratings": [
+        "15 min - 1 hour",
+        "<15 min"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 2",
+      "id": "sympy__sympy-12481",
+      "language": "python",
+      "repository": "sympy/sympy",
+      "f2p_count": 1,
+      "p2p_count": 7,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "verified"
+    },
+    {
+      "round": "round 2",
+      "id": "cli__cli-402",
+      "language": "go",
+      "repository": "cli/cli",
+      "f2p_count": 1,
+      "p2p_count": 51,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 2",
+      "id": "iamkun__dayjs-569",
+      "language": "javascript",
+      "repository": "iamkun/dayjs",
+      "f2p_count": 1,
+      "p2p_count": 37,
+      "difficulty_ratings": [
+        "1-4 hours",
+        "15 min - 1 hour"
+      ],
+      "difficulty_consensus": "1-4 hours",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 2",
+      "id": "sympy__sympy-12489",
+      "language": "python",
+      "repository": "sympy/sympy",
+      "f2p_count": 1,
+      "p2p_count": 8,
+      "difficulty_ratings": [
+        "1-4 hours"
+      ],
+      "difficulty_consensus": "1-4 hours",
+      "label_source": "verified"
+    },
+    {
+      "round": "round 3",
+      "id": "cli__cli-405",
+      "language": "go",
+      "repository": "cli/cli",
+      "f2p_count": 1,
+      "p2p_count": 51,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 3",
+      "id": "iamkun__dayjs-589",
+      "language": "javascript",
+      "repository": "iamkun/dayjs",
+      "f2p_count": 1,
+      "p2p_count": 38,
+      "difficulty_ratings": [
+        "15 min - 1 hour",
+        "<15 min"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 3",
+      "id": "sympy__sympy-13031",
+      "language": "python",
+      "repository": "sympy/sympy",
+      "f2p_count": 1,
+      "p2p_count": 9,
+      "difficulty_ratings": [
+        "15 min - 1 hour"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "verified"
+    },
+    {
+      "round": "round 3",
+      "id": "django__django-10880",
+      "language": "python",
+      "repository": "django/django",
+      "f2p_count": 1,
+      "p2p_count": 55,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "verified"
+    },
+    {
+      "round": "round 3",
+      "id": "cli__cli-474",
+      "language": "go",
+      "repository": "cli/cli",
+      "f2p_count": 2,
+      "p2p_count": 108,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 3",
+      "id": "iamkun__dayjs-591",
+      "language": "javascript",
+      "repository": "iamkun/dayjs",
+      "f2p_count": 1,
+      "p2p_count": 38,
+      "difficulty_ratings": [
+        "15 min - 1 hour",
+        "<15 min"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 3",
+      "id": "sympy__sympy-13091",
+      "language": "python",
+      "repository": "sympy/sympy",
+      "f2p_count": 2,
+      "p2p_count": 89,
+      "difficulty_ratings": [
+        "15 min - 1 hour"
+      ],
+      "difficulty_consensus": "15 min - 1 hour",
+      "label_source": "verified"
+    },
+    {
+      "round": "round 3",
+      "id": "django__django-10914",
+      "language": "python",
+      "repository": "django/django",
+      "f2p_count": 1,
+      "p2p_count": 98,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "verified"
+    },
+    {
+      "round": "round 3",
+      "id": "cli__cli-477",
+      "language": "go",
+      "repository": "cli/cli",
+      "f2p_count": 1,
+      "p2p_count": 90,
+      "difficulty_ratings": [
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "msb"
+    },
+    {
+      "round": "round 3",
+      "id": "iamkun__dayjs-602",
+      "language": "javascript",
+      "repository": "iamkun/dayjs",
+      "f2p_count": 2,
+      "p2p_count": 38,
+      "difficulty_ratings": [
+        "<15 min",
+        "<15 min"
+      ],
+      "difficulty_consensus": "<15 min",
+      "label_source": "msb"
+    }
+  ]
+}

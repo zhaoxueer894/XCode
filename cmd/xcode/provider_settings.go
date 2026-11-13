@@ -11,8 +11,8 @@ import (
 
 	"xcode/internal/config"
 	"xcode/internal/harness"
-	"xcode/internal/model/chatcompletions"
 	"xcode/internal/model/bailian"
+	"xcode/internal/model/chatcompletions"
 	"xcode/internal/model/deepseek"
 	"xcode/internal/model/glm"
 )
@@ -22,6 +22,9 @@ const (
 	defaultDeepseekModel   = "deepseek-flash"
 	defaultGlmBaseURL      = "https://open.bigmodel.cn/api/paas/v4"
 	defaultGlmModel        = "glm-4.6"
+	// defaultReviewerOutputTokens is larger than the developer default because a
+	// thinking reviewer must reason before emitting its single GATE-VERDICT line.
+	defaultReviewerOutputTokens = 32768
 )
 
 // pick 返回第一个非空（去空白后）候选值，调用方按优先级顺序传入。
@@ -64,27 +67,41 @@ func deepseekSettings(cfg config.Config, thinking, effort string, retries, outpu
 }
 
 // glmSettings builds the glm client config; modelOverride (reviewer-model) wins.
-func glmSettings(cfg config.Config, modelOverride string, retries int) glm.Config {
+func glmSettings(cfg config.Config, modelOverride string, retries, outputTokens int) glm.Config {
 	return glm.Config{
-		APIKey:         pick(cfg.GlmAPIKey, os.Getenv("GLM_API_KEY")),
-		BaseURL:        pick(cfg.GlmBaseURL, os.Getenv("GLM_BASE_URL"), defaultGlmBaseURL),
-		Model:          pick(modelOverride, cfg.GlmModel, os.Getenv("GLM_MODEL"), defaultGlmModel),
-		MaxRetries:     retries,
-		DisableRetries: retries == 0,
+		APIKey:          pick(cfg.GlmAPIKey, os.Getenv("GLM_API_KEY")),
+		BaseURL:         pick(cfg.GlmBaseURL, os.Getenv("GLM_BASE_URL"), defaultGlmBaseURL),
+		Model:           pick(modelOverride, cfg.GlmModel, os.Getenv("GLM_MODEL"), defaultGlmModel),
+		MaxOutputTokens: outputTokens,
+		MaxRetries:      retries,
+		DisableRetries:  retries == 0,
 	}
+}
+
+// reviewerOutputBudget returns the per-request output limit for the gate
+// reviewer. A thinking reviewer spends this budget on reasoning before it can
+// emit its one-line verdict, so a reviewer left at the developer default can
+// hit the cap mid-reasoning and never produce a verdict at all. Callers pass
+// an explicit value only when they know it is enough.
+func reviewerOutputBudget(configured int) int {
+	if configured > 0 {
+		return configured
+	}
+	return defaultReviewerOutputTokens
 }
 
 // buildReviewerModel builds the cross-model reviewer; a non-empty
 // modelOverride replaces the provider default. The returned model is not
 // budget-wrapped (the caller wraps it as sub:reviewer).
-func buildReviewerModel(cfg config.Config, provider, modelOverride string, retries int) (harness.Model, string, error) {
+func buildReviewerModel(cfg config.Config, provider, modelOverride string, retries, outputTokens int) (harness.Model, string, error) {
+	outputTokens = reviewerOutputBudget(outputTokens)
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "glm":
-		settings := glmSettings(cfg, modelOverride, retries)
+		settings := glmSettings(cfg, modelOverride, retries, outputTokens)
 		client, err := glm.New(settings)
 		return client, settings.Model, err
 	case "deepseek":
-		settings := deepseekSettings(cfg, "enabled", "high", retries, 0)
+		settings := deepseekSettings(cfg, "enabled", "high", retries, outputTokens)
 		if strings.TrimSpace(modelOverride) != "" {
 			settings.Model = strings.TrimSpace(modelOverride)
 		}
@@ -92,6 +109,7 @@ func buildReviewerModel(cfg config.Config, provider, modelOverride string, retri
 		return client, settings.Model, err
 	case "bailian":
 		settings := bailianSettings(cfg, retries)
+		settings.MaxOutputTokens = outputTokens
 		if strings.TrimSpace(modelOverride) != "" {
 			settings.Model = strings.TrimSpace(modelOverride)
 		}

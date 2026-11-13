@@ -111,6 +111,35 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 	}
 	a.emit(Event{Kind: RunStarted, Data: lastInput})
 	var totalUsage Usage
+	lastHandoffEdit := -1
+	workerCorrectionUsed := false
+	workerCorrectionPending := false
+	guardSubmission := options.Orchestrate == "single-review" && options.FunctionalRepair != nil &&
+		options.Contract != nil && options.CandidatePatch != nil
+	submissionPending := false
+	workerCorrectionPrompt := options.WorkerCorrectionPrompt
+	if workerCorrectionPrompt == "" {
+		workerCorrectionPrompt = "Use the structured tool interface if you still need to act. Otherwise return the requested stage handoff now."
+	}
+	complete := func(step int, answer string) RunResult {
+		a.turnLog.AppendCompleted(step, answer)
+		a.emit(Event{Kind: RunCompleted, Step: step, Data: answer, StopReason: StopCompleted})
+		return RunResult{Answer: answer, StopReason: StopCompleted, Steps: step, Usage: totalUsage, Messages: messages}
+	}
+	failGate := func(step int, gate gateResult) (RunResult, error) {
+		err := fmt.Errorf("completion gate: %s", strings.Join(gate.Reasons, "; "))
+		a.fail(step, StopFailed, err)
+		return RunResult{StopReason: StopFailed, Steps: step, Usage: totalUsage, Messages: messages}, err
+	}
+	handoff := func(step int, terminal bool) gateResult {
+		gate := a.runCompletionGate(ctx, step, options, terminal)
+		if gate.Passed {
+			a.emit(Event{Kind: CompletionGatePassed, Step: step, Data: gate.Fingerprint})
+		} else {
+			a.emit(Event{Kind: CompletionGateBlocked, Step: step, Data: strings.Join(gate.Reasons, "; ")})
+		}
+		return gate
+	}
 	// run 级共享进度账本：CLI 经 WithRunProgress 注入时，主智能体与全部子智能体
 	// 读写同一本账；未注入时退回私有账本（单智能体等价）。
 	progress := runtimeProgressFromContext(ctx)
@@ -164,25 +193,130 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 			a.emitModelEvent(step, event)
 		})
 		modelContext := context.WithValue(ctx, runtimeProgressKey{}, progress)
-		response, err := a.model.Generate(modelContext, modelInput, advertisedTools(a.runner.Specs(), options.Orchestrate), modelSink)
+		var submission *submissionCorrection
+		if guardSubmission {
+			hasPatch, err := options.CandidatePatch(ctx)
+			if err != nil {
+				return failGate(step, gateResult{Reasons: []string{"could not verify candidate patch: " + err.Error()}})
+			}
+			submission = &submissionCorrection{missing: !hasPatch, requested: submissionPending || step == maxSteps}
+			modelContext = context.WithValue(modelContext, submissionCorrectionKey{}, submission)
+		}
+		textOnlyCorrection := workerCorrectionPending && options.WorkerCorrectionTextOnly
+		if workerCorrectionPending {
+			modelContext = context.WithValue(modelContext, stageCorrectionKey{}, true)
+			workerCorrectionPending = false
+		}
+		var tools []ToolSpec
+		if textOnlyCorrection {
+			modelContext = context.WithValue(modelContext, textHandoffKey{}, true)
+		} else if options.FinalTextCheck == nil {
+			tools = advertisedTools(a.runner.Specs(), options.Orchestrate)
+		}
+		response, err := a.model.Generate(modelContext, modelInput, tools, modelSink)
+		if textOnlyCorrection && len(response.ToolCalls) > 0 {
+			response.ToolCalls = nil
+			response.WithheldToolCalls = true
+		}
 		if err != nil {
+			totalUsage.InputTokens += response.Usage.InputTokens
+			totalUsage.OutputTokens += response.Usage.OutputTokens
+			totalUsage.TotalTokens += response.Usage.TotalTokens
+			if errors.Is(err, ErrIncompleteModelResponse) && options.WorkerHandoff != nil {
+				a.emit(Event{Kind: StageOutputInvalid, Step: step, Data: err.Error()})
+			}
+			if errors.Is(err, ErrIncompleteModelResponse) && step < maxSteps && ctx.Err() == nil {
+				switch {
+				case options.WorkerHandoff != nil && !workerCorrectionUsed:
+					workerCorrectionUsed, workerCorrectionPending = true, true
+					messages = append(messages, Message{Role: "user", Content: "The previous model response was incomplete. No tools from it executed. " + workerCorrectionPrompt})
+					continue
+				case options.FinalTextCheck != nil:
+					messages = append(messages, Message{Role: "user", Content: "The previous response was incomplete. Return only a valid final verdict, with no tool calls."})
+					continue
+				}
+			}
 			reason := StopFailed
 			if errors.Is(err, ErrBudget) {
 				reason = StopBudget
+				if options.WorkerHandoff != nil && options.CandidatePatch != nil {
+					if patched, checkErr := options.CandidatePatch(ctx); checkErr == nil && patched {
+						return complete(step-1, "Developer reached its budget after producing a candidate patch. Verification is pending."), nil
+					}
+				}
+				if options.StagedReview && options.Contract != nil && step > 1 &&
+					progress.ProductionEdits != lastHandoffEdit && ctx.Err() == nil {
+					gate := handoff(step, true)
+					if gate.Passed {
+						return complete(step, "Completion gate accepted the current patch."), nil
+					}
+					if gate.Final {
+						return failGate(step, gate)
+					}
+				}
 			}
 			a.fail(step, reason, err)
 			return RunResult{StopReason: reason, Steps: step, Usage: totalUsage, Messages: messages}, fmt.Errorf("generate at step %d: %w", step, err)
 		}
 
-		assistant := Message{
-			Role:             "assistant",
-			Content:          response.Content,
-			ReasoningContent: response.ReasoningContent,
-			ToolCalls:        response.ToolCalls,
+		normalStop := response.FinishReason == "" || response.FinishReason == "stop"
+		toolStop := response.FinishReason == "tool_calls" && len(response.ToolCalls) > 0
+		if options.WorkerHandoff != nil && (len(response.ToolCalls) == 0 || (!normalStop && !toolStop)) {
+			checkErr := options.WorkerHandoff(ctx, response.Content)
+			if !normalStop {
+				checkErr = fmt.Errorf("%w: unexpected finish reason %q", ErrIncompleteModelResponse, response.FinishReason)
+			}
+			if response.WithheldToolCalls {
+				checkErr = fmt.Errorf("%w: tool calls were discarded; no tool from this response ran", ErrIncompleteModelResponse)
+			}
+			if checkErr != nil {
+				a.emit(Event{Kind: ModelCompleted, Step: step, Data: response.Content, FinishReason: response.FinishReason,
+					InputTokens: response.Usage.InputTokens, OutputTokens: response.Usage.OutputTokens, TotalTokens: response.Usage.TotalTokens})
+				totalUsage.InputTokens += response.Usage.InputTokens
+				totalUsage.OutputTokens += response.Usage.OutputTokens
+				totalUsage.TotalTokens += response.Usage.TotalTokens
+				a.emit(Event{Kind: StageOutputInvalid, Step: step, Data: checkErr.Error()})
+				if workerCorrectionUsed || step == maxSteps {
+					a.fail(step, StopFailed, checkErr)
+					return RunResult{StopReason: StopFailed, Steps: step, Usage: totalUsage, Messages: messages}, checkErr
+				}
+				workerCorrectionUsed, workerCorrectionPending = true, true
+				messages = append(messages, Message{Role: "user", Content: "Your last handoff was rejected: " + checkErr.Error() +
+					". No tools from that reply executed. " + workerCorrectionPrompt})
+				continue
+			}
 		}
-		messages = append(messages, assistant)
-		// 模型请求完成边界——assistant 消息（含全部工具调用）已确定，落盘供恢复重建。
-		a.turnLog.AppendAssistant(step, assistant)
+
+		if options.FinalTextCheck != nil {
+			checkErr := options.FinalTextCheck(response.Content)
+			if len(response.ToolCalls) > 0 || !normalStop || checkErr != nil {
+				a.emit(Event{Kind: ModelCompleted, Step: step, Data: response.Content, FinishReason: response.FinishReason})
+				totalUsage.InputTokens += response.Usage.InputTokens
+				totalUsage.OutputTokens += response.Usage.OutputTokens
+				totalUsage.TotalTokens += response.Usage.TotalTokens
+				if step == maxSteps {
+					err := fmt.Errorf("reviewer did not return a valid final verdict")
+					a.fail(step, StopFailed, err)
+					return RunResult{StopReason: StopFailed, Steps: step, Usage: totalUsage, Messages: messages}, err
+				}
+				messages = append(messages, Message{Role: "user", Content: "Return a final verdict now, with no tool calls: GATE-VERDICT: PASS or GATE-VERDICT: ISSUES: <specific issue>."})
+				continue
+			}
+		}
+
+		prematureSubmission := submission != nil && submission.missing && !submission.active &&
+			len(response.ToolCalls) == 0 && step < maxSteps
+		if !prematureSubmission {
+			assistant := Message{
+				Role:             "assistant",
+				Content:          response.Content,
+				ReasoningContent: response.ReasoningContent,
+				ToolCalls:        response.ToolCalls,
+			}
+			messages = append(messages, assistant)
+			// 模型请求完成边界——assistant 消息（含全部工具调用）已确定，落盘供恢复重建。
+			a.turnLog.AppendAssistant(step, assistant)
+		}
 		totalUsage.InputTokens += response.Usage.InputTokens
 		totalUsage.OutputTokens += response.Usage.OutputTokens
 		totalUsage.TotalTokens += response.Usage.TotalTokens
@@ -197,17 +331,32 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 		})
 
 		if len(response.ToolCalls) == 0 {
+			if prematureSubmission {
+				submissionPending = true
+				a.emit(Event{Kind: CompletionGateBlocked, Step: step, Data: "no production patch; requesting an editable correction"})
+				messages = append(messages, Message{Role: "user", Content: "No production patch exists. Use the structured apply_patch tool to implement the smallest justified fix."})
+				continue
+			}
 			// 完成门禁——纯文本只是模型的完成声明；契约存在时先在当前工作区上重取环境证据，
 			// 未满足则把确定性失败证据回注为 user 消息并继续循环（消耗剩余步数），不凭自述结束。
 			// 门禁的验证/审查调用走统一执行管线，但不进入消息历史与恢复日志：恢复后门禁会重新取证。
 			if options.Contract != nil {
-				gate := a.runCompletionGate(ctx, step, options)
+				gate := a.runCompletionGate(ctx, step, options, false)
+				if gate.ReviewAttempted || gate.Passed {
+					lastHandoffEdit = progress.ProductionEdits
+				}
 				if !gate.Passed {
 					a.emit(Event{Kind: CompletionGateBlocked, Step: step, Data: strings.Join(gate.Reasons, "; ")})
+					if gate.Final {
+						return failGate(step, gate)
+					}
 					messages = append(messages, Message{Role: "user", Content: gate.UserMessage})
 					continue
 				}
 				a.emit(Event{Kind: CompletionGatePassed, Step: step, Data: gate.Fingerprint})
+				if gate.Final {
+					return complete(step, "Functional checks accepted the final patch. See the recorded evidence and any static verdict."), nil
+				}
 			}
 			// 轮次正常完成——写终止记录，恢复器据此认定没有未完成轮次。
 			// 失败、受控停止与崩溃不写终止记录，这些轮次保持未终止，是 --resume 的恢复对象。
@@ -221,6 +370,7 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 				Messages:   messages,
 			}, nil
 		}
+		editsBeforeTools := progress.ProductionEdits
 		for _, call := range response.ToolCalls {
 			// 单调用执行路径抽为 runToolCall，恢复预处理与正常循环共用同一实现。
 			if a.runToolCall(ctx, step, call, &messages, doom, progress) {
@@ -228,6 +378,27 @@ func (a *Agent) RunTurn(ctx context.Context, messages []Message, options RunOpti
 				a.fail(step, StopDoomLoop, err)
 				return RunResult{StopReason: StopDoomLoop, Steps: step, Usage: totalUsage, Messages: messages}, err
 			}
+		}
+		if submission != nil && submission.active {
+			gate := handoff(step, true)
+			if gate.Passed {
+				return complete(step, "Completion gate accepted the patch submitted in the correction."), nil
+			}
+			return failGate(step, gate)
+		}
+		if options.StagedReview && options.Orchestrate == "pipeline" && options.Contract != nil &&
+			progress.ProductionEdits > editsBeforeTools && ctx.Err() == nil {
+			gate := handoff(step, false)
+			if gate.ReviewAttempted || gate.Passed {
+				lastHandoffEdit = progress.ProductionEdits
+			}
+			if gate.Passed {
+				return complete(step, "Completion gate accepted the developer's patch."), nil
+			}
+			if gate.Final {
+				return failGate(step, gate)
+			}
+			messages = append(messages, Message{Role: "user", Content: gate.UserMessage})
 		}
 	}
 	a.fail(maxSteps, StopMaxSteps, ErrMaxSteps)

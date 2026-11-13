@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-mod-semver-compare",
+  "language": "python",
+  "kind": "module",
+  "prompt": "Implement `compare(left, right)` in solution.py: compare two dotted numeric version strings and return -1, 0 or 1. A leading 'v' or 'V' is ignored, missing trailing components count as zero, and components compare as integers rather than strings. Raise ValueError for an empty string or a non-numeric component.",
+  "acceptance": [
+    "missing components are treated as zero",
+    "comparison is numeric, not lexical",
+    "invalid input raises ValueError"
+  ],
+  "tags": [
+    "module",
+    "comparison"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

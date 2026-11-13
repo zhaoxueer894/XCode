@@ -45,10 +45,12 @@ type TaskContract struct {
 
 // gateResult 保存一次门禁评估的结论；Passed 为 false 时 UserMessage 必须携带可回注的证据。
 type gateResult struct {
-	Passed      bool     // 表示门禁是否放行完成声明。
-	Fingerprint string   // 保存本次评估使用的工作区指纹（可能为空）。
-	Reasons     []string // 保存全部阻塞原因；进入 completion.gate.blocked 事件。
-	UserMessage string   // 保存回注给模型的确定性失败证据文本。
+	Final           bool
+	ReviewAttempted bool
+	Passed          bool     // 表示门禁是否放行完成声明。
+	Fingerprint     string   // 保存本次评估使用的工作区指纹（可能为空）。
+	Reasons         []string // 保存全部阻塞原因；进入 completion.gate.blocked 事件。
+	UserMessage     string   // 保存回注给模型的确定性失败证据文本。
 }
 
 // maxGateDetailBytes 限制单条失败证据进入回注消息的长度，防止一条输出占满上下文。
@@ -57,7 +59,10 @@ const maxGateDetailBytes = 800
 // runCompletionGate 在模型给出纯文本后评估完成契约；全部检查通过才允许结束轮次。
 // 验证命令与 reviewer 都经由 a.runner（统一执行管线）执行，因此同样经过策略、审批、
 // 快照与 journal——门禁没有第二条绕过安全管线的执行路径。
-func (a *Agent) runCompletionGate(ctx context.Context, step int, options RunOptions) gateResult {
+func (a *Agent) runCompletionGate(ctx context.Context, step int, options RunOptions, terminal bool) gateResult {
+	if options.FunctionalRepair != nil {
+		return a.runFunctionalGate(ctx, step, options, terminal)
+	}
 	contract := options.Contract
 	result := gateResult{}
 
@@ -66,8 +71,18 @@ func (a *Agent) runCompletionGate(ctx context.Context, step int, options RunOpti
 	if options.PipelinePrecondition != nil {
 		if missing := options.PipelinePrecondition(); len(missing) > 0 {
 			result.Reasons = append(result.Reasons, missing...)
-			result.UserMessage = gateUserMessage(contract, result.Reasons)
-			return result
+			if !options.StagedReview || !terminal {
+				result.UserMessage = gateUserMessage(contract, result.Reasons)
+				return result
+			}
+		}
+	}
+	if options.CandidatePatch != nil {
+		changed, err := options.CandidatePatch(ctx)
+		if err != nil {
+			result.Reasons = append(result.Reasons, "could not verify candidate patch: "+err.Error())
+		} else if !changed {
+			result.Reasons = append(result.Reasons, "no production-code change relative to the task baseline")
 		}
 	}
 
@@ -97,7 +112,7 @@ func (a *Agent) runCompletionGate(ctx context.Context, step int, options RunOpti
 				fmt.Sprintf("verify command %q failed: %s", verify.Name, evidence.Detail))
 		}
 	}
-	if len(result.Reasons) > 0 {
+	if len(result.Reasons) > 0 && !options.StagedReview {
 		result.UserMessage = gateUserMessage(contract, result.Reasons)
 		return result
 	}
@@ -110,7 +125,8 @@ func (a *Agent) runCompletionGate(ctx context.Context, step int, options RunOpti
 			return result
 		}
 		if contract.reviewerPassed != fingerprint {
-			issues, err := a.executeGateReview(ctx, step, contract)
+			result.ReviewAttempted = true
+			issues, err := a.executeGateReview(ctx, step, contract, fingerprint, options.StagedReview)
 			if err != nil {
 				result.Reasons = append(result.Reasons, "reviewer failed: "+err.Error())
 				result.UserMessage = gateUserMessage(contract, result.Reasons)
@@ -125,7 +141,10 @@ func (a *Agent) runCompletionGate(ctx context.Context, step int, options RunOpti
 		}
 	}
 
-	result.Passed = true
+	result.Passed = len(result.Reasons) == 0
+	if !result.Passed {
+		result.UserMessage = gateUserMessage(contract, result.Reasons)
+	}
 	return result
 }
 
@@ -196,7 +215,15 @@ func (a *Agent) executeGateVerify(ctx context.Context, step, index int, verify V
 
 // executeGateReview 以 reviewer 角色运行一次 fresh-context 独立审查。
 // 返回 issues 文本（通过时为空）；reviewer 的判断只作为辅助，环境证据仍是最终事实源。
-func (a *Agent) executeGateReview(ctx context.Context, step int, contract *TaskContract) (string, error) {
+type gateReviewKey struct{}
+
+// IsGateReview reports whether the framework, rather than the model, requested review.
+func IsGateReview(ctx context.Context) bool {
+	active, _ := ctx.Value(gateReviewKey{}).(bool)
+	return active
+}
+
+func (a *Agent) executeGateReview(ctx context.Context, step int, contract *TaskContract, fingerprint string, staged bool) (string, error) {
 	var b strings.Builder
 	b.WriteString("你是完成门禁的独立审查者，带全新上下文，没有看过开发过程。\n")
 	b.WriteString("任务目标：" + contract.Goal + "\n")
@@ -207,6 +234,20 @@ func (a *Agent) executeGateReview(ctx context.Context, step int, contract *TaskC
 		}
 	}
 	b.WriteString("只读审查当前工作区状态，不要修改任何文件。\n")
+	if staged {
+		b.WriteString("\nThis is the final, read-only decision for the current patch. Assess the design, maintainability, scope, and regression risks of the change. Use the recorded tests as evidence of functional verification; do not rerun tests.\n")
+		for _, evidence := range contract.Evidence {
+			if evidence.Fingerprint == fingerprint {
+				fmt.Fprintf(&b, "\nVerification %s: exit code %d. %s", evidence.Name, evidence.ExitCode, evidence.Detail)
+			}
+		}
+		diff, err := a.runner.Execute(ctx, ToolCall{ID: "gate-review-diff", Name: "git_diff", Arguments: json.RawMessage(`{}`)})
+		if err != nil {
+			return "", fmt.Errorf("capture patch for reviewer: %w", err)
+		}
+		b.WriteString("\nPatch evidence:\n" + diff.Observation + "\n")
+		b.WriteString("\nReturn a verdict in this response. No tools are available. Do not request tools, emit tool-call markup, or defer the decision. If any necessary evidence is missing or tests failed, return ISSUES and identify the gap or failure. Use PASS only if the available evidence supports it.\n")
+	}
 	b.WriteString("最后一行必须且只能是以下两种格式之一：\nGATE-VERDICT: PASS\nGATE-VERDICT: ISSUES: <具体问题>\n")
 
 	arguments, _ := json.Marshal(map[string]any{"role": "reviewer", "prompt": b.String(), "max_steps": 8})
@@ -215,7 +256,7 @@ func (a *Agent) executeGateReview(ctx context.Context, step int, contract *TaskC
 		Kind: ToolStarted, Step: step, Tool: "delegate", ToolCallID: call.ID,
 		Data: "[gate] reviewer review",
 	})
-	toolResult, err := a.runner.Execute(ctx, call)
+	toolResult, err := a.runner.Execute(context.WithValue(ctx, gateReviewKey{}, true), call)
 	output := toolResult.Observation
 	if err != nil {
 		a.emit(Event{Kind: ToolCompleted, Step: step, Tool: "delegate", ToolCallID: call.ID, Data: compactGateText(err.Error(), 200)})
@@ -227,7 +268,27 @@ func (a *Agent) executeGateReview(ctx context.Context, step int, contract *TaskC
 	if !found {
 		return "", fmt.Errorf("reviewer output has no GATE-VERDICT line")
 	}
+	if staged {
+		verdict := "PASS"
+		if issues != "" {
+			verdict = issues
+		}
+		a.emit(Event{Kind: ReviewVerdict, Step: step, ToolCallID: call.ID, Data: compactGateText(verdict, maxGateDetailBytes)})
+	}
 	return issues, nil
+}
+
+// ValidateGateVerdict rejects empty, malformed, or unrecognized reviewer output.
+func ValidateGateVerdict(text string) error {
+	last := strings.TrimSpace(text)
+	if index := strings.LastIndexByte(last, '\n'); index >= 0 {
+		last = strings.TrimSpace(last[index+1:])
+	}
+	if last == "GATE-VERDICT: PASS" ||
+		(strings.HasPrefix(last, "GATE-VERDICT: ISSUES:") && strings.TrimSpace(strings.TrimPrefix(last, "GATE-VERDICT: ISSUES:")) != "") {
+		return nil
+	}
+	return fmt.Errorf("reviewer output must end with a valid GATE-VERDICT line")
 }
 
 // parseGateVerdict 从 reviewer 输出中取最后一行 GATE-VERDICT 判定。

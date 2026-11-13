@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-mod-ini-parser",
+  "language": "python",
+  "kind": "module",
+  "prompt": "Implement `parse_ini(text)` in solution.py: parse a small INI-style configuration into {section: {key: value}}. Section headers are [name]; keys before any header belong to section \"\". Trim whitespace around keys and values, ignore blank lines and lines starting with '#' or ';', keep '=' inside values, let a repeated key win with its last value, and raise ValueError for a non-empty line that is neither a comment, a header nor a key=value pair.",
+  "acceptance": [
+    "sectionless keys land in the \"\" section",
+    "only the first '=' splits key and value",
+    "malformed lines raise ValueError"
+  ],
+  "tags": [
+    "module",
+    "parser"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}

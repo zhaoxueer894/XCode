@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "go-algo-rotated-search",
+  "language": "go",
+  "kind": "algo",
+  "prompt": "Implement Search in solution.go: values is sorted ascending and rotated by an unknown amount with distinct elements. Return the index of target, or -1 when absent, in logarithmic time.",
+  "acceptance": [
+    "works on rotated and unrotated input",
+    "absent targets and empty input return -1"
+  ],
+  "tags": [
+    "algorithm",
+    "binary-search"
+  ],
+  "verify_commands": [
+    [
+      "go",
+      "test",
+      "./..."
+    ]
+  ],
+  "hidden_command": [
+    [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ]
+  ]
+}

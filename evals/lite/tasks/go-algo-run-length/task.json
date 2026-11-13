@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "go-algo-run-length",
+  "language": "go",
+  "kind": "algo",
+  "prompt": "Implement Encode and Decode in solution.go. Encode folds consecutive equal characters into a []Pair of {Rune, Count} in order and returns an empty result for empty input. Decode rebuilds the original string. Keep the Pair type and both signatures unchanged.",
+  "acceptance": [
+    "encode folds consecutive equal runes and handles empty input",
+    "decode inverts encode exactly, including counts above nine and non-ASCII text"
+  ],
+  "tags": [
+    "algorithm",
+    "string"
+  ],
+  "verify_commands": [
+    [
+      "go",
+      "test",
+      "./..."
+    ]
+  ],
+  "hidden_command": [
+    [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ]
+  ]
+}

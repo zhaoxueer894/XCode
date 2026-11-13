@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "go-algo-max-subarray",
+  "language": "go",
+  "kind": "algo",
+  "prompt": "Implement MaxSubarraySum in solution.go using a single linear pass: return the largest sum of a non-empty contiguous subarray, and ErrEmpty for an empty slice.",
+  "acceptance": [
+    "the maximum is over non-empty contiguous subarrays",
+    "all-negative input returns the largest single value",
+    "empty input returns ErrEmpty"
+  ],
+  "tags": [
+    "algorithm",
+    "dynamic-programming"
+  ],
+  "verify_commands": [
+    [
+      "go",
+      "test",
+      "./..."
+    ]
+  ],
+  "hidden_command": [
+    [
+      "go",
+      "test",
+      "-count=1",
+      "./..."
+    ]
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "py-algo-balanced-parens",
+  "language": "python",
+  "kind": "algo",
+  "prompt": "Implement `is_balanced(text)` in solution.py. text contains only '(', ')' and '*'; '*' may count as '(' , ')' or as nothing. Return True when some choice of the wildcards yields balanced parentheses. Raise ValueError for any other character.",
+  "acceptance": [
+    "every wildcard assignment is considered, not just one",
+    "an early unmatched ')' is rejected",
+    "unsupported characters raise ValueError"
+  ],
+  "tags": [
+    "algorithm",
+    "greedy"
+  ],
+  "verify_commands": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py"
+    ]
+  ],
+  "hidden_command": [
+    [
+      "{python}",
+      "-m",
+      "unittest",
+      "-v",
+      "test_visible.py",
+      "test_hidden.py"
+    ]
+  ]
+}
