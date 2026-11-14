@@ -1,0 +1,251 @@
+[English](README.md) | **简体中文**
+
+# XCode
+
+XCode 是一个用 Go 写的多智能体编码工具。你给它一个任务（比如"修复这个 bug 并跑通测试"），它会在指定的工作区里读代码、改代码、运行命令，最后告诉你做了什么、结果如何。
+
+## 多智能体设计
+
+架构是 Orchestrator-Worker（编排者-工作者）。主智能体负责跟你对齐目标、拆解和派活，具体执行交给角色化的子智能体：
+
+```text
+编排者（主智能体）
+  ├─ delegate → planner    拆解任务，不改文件
+  ├─ delegate → developer  改代码、跑测试
+  └─ delegate → reviewer   独立检查，给 pass / issues
+```
+
+**角色分工。** 三个内置角色各有自己的指令：planner 只拆解不动手；developer 负责改代码和跑验证；reviewer 只看代码和工作区的最终状态。角色可以用 `.xcode/skills/<角色名>.md` 自定义。
+
+**上下文隔离。** 每次 delegate 都会创建一个全新的子智能体：独立的对话历史、独立的轮数预算，不继承父级上下文，做完只回传一份结论摘要。这是刻意设计——reviewer 看不到 developer 的推理过程，才能做出真正独立的判断。
+
+**通信与轨迹。** 下行是任务包（角色 + 任务描述），上行是结论摘要，不共享聊天记录。所有子智能体的行为事件带 `agent_id` 汇入同一条 JSONL 轨迹，谁做了什么可回查。
+
+**完成门禁。** 传入完成契约后，XCode 会在模型声称完成时运行验证命令；契约启用 `review` 时，再派一个全新上下文的 reviewer 复查，输出 `GATE-VERDICT: PASS` 或 `ISSUES`。被打回就继续修，直到通过或预算耗尽。编译、测试这些环境真实结果才是最终事实源。
+
+想验证多智能体是否真的有收益？`xcode eval --no-delegate` 一键关闭委派，同一批任务对照单智能体跑分。
+
+工具执行有安全约束：写文件前自动快照（可恢复），命令默认限定在工作区内，敏感操作需要你确认。
+
+## 快速开始
+
+需要 Go 1.26+。编译后直接运行，首次会在终端弹出模型选择菜单（不想用菜单就直接编辑配置文件，见下一节）：
+
+```bash
+go build -o bin/xcode.exe ./cmd/xcode
+cp .xcode/config.example .xcode/config    # 复制模板并填入你的模型密钥（该文件不入库）
+bin/xcode.exe               # 交互模式（REPL 多轮对话）
+bin/xcode.exe "修个 bug"     # 一次性任务
+```
+
+不想每次敲 `bin/xcode.exe` 的话，可选安装到用户 PATH（不装也完全可用）：
+
+```bash
+bin/xcode.exe install       # 复制到用户目录并写入 PATH；新开终端后直接运行 xcode
+```
+
+不配置任何真实模型时会使用 demo 假模型：一段写死在源码里的确定性逻辑（把提示词最后一个词当文件名读一次），让你零成本跑通整条流程，也给自动化测试和离线评测提供复现能力。它不会理解你的任务，更不会真的修 bug——**真实任务请按下一节配置真实模型**。
+
+## 配置模型
+
+所有模型配置收敛在一个文件：**全局 `~/.xcode/config`**（Windows 即 `C:\Users\<你>\.xcode\config`）。首次运行向导帮你写的就是它；手动编辑完全等价。项目级 `.xcode/config` 可按需覆盖全局。取值优先级：命令行 flag > 项目配置 > 全局配置 > 环境变量 > 内置默认。
+
+```ini
+# 默认供应商：demo / bailian / deepseek
+provider=bailian
+
+# 通义千问（阿里云百炼）
+bailian-api-key=sk-xxxxxxxx
+bailian-base-url=https://dashscope.aliyuncs.com/compatible-mode/v1
+bailian-model=qwen-plus
+
+# DeepSeek（base-url 有默认值，通常只填 key 和 model）
+deepseek-api-key=sk-xxxxxxxx
+deepseek-base-url=https://api.deepseek.com
+deepseek-model=deepseek-flash
+```
+
+要点：
+
+- base-url 和 model 都有默认值，只填 api-key 也能跑；三家的键完全对称。
+- Key 只建议写在全局配置（在仓库外，不会被误提交）；往项目 `.xcode/config` 写 Key 前请注意它可能随仓库提交。
+- 环境变量（`DASHSCOPE_API_KEY`、`DEEPSEEK_API_KEY` 等）仍然有效，但只作为 CI 等无配置文件场景的注入兜底。
+- 配了 Key 但 provider 还是 demo 时，启动会主动询问是否切换，不会再静默跑假模型。
+- `--provider` flag 保留，用于临时覆盖或脚本场景。
+
+> **从旧版本升级**：`.env` 和 `--model-config` 已移除。启动时若检测到旧 `.env` 会打印一次性迁移提示，把 Key 搬进上面的配置文件即可。
+
+## 可选：压缩决策分类器（jev）
+
+这是一个用于compact的进阶功能，不配置也不影响正常使用。
+
+长对话会被压缩以节省上下文。压缩时 XCode 把历史拆成一个个"证据单元"，决定哪些保留、哪些截断、哪些丢弃——默认由内置规则决定。如果你想用模型来做这些决定，有两种后端：
+
+- **local**：默认复用主模型当分类器，零额外配置；也可用 `typed-classifier-api-key/-endpoint/-model` 指定专门的分类模型（不填钥匙时回退百炼键）。
+- **jev**：调用 TypeSafe 的 systemone 分类服务。需要在配置文件（`~/.xcode/config`）追加三个键：
+
+  ```ini
+  typesafe-api-key=你的密钥
+  typesafe-endpoint=服务端点地址
+  typesafe-model=模型名
+  ```
+
+  然后在 `.xcode/config` 里写 `typed-classifier=jev`（不写默认 local），运行时加 `--typed-shadow` 开启。
+
+shadow 指的是分类结果只记录、不生效——真实压缩仍走规则，方便对比模型和规则谁判得好。
+
+## 怎么用
+
+### 一次性任务
+
+位置参数就是任务描述，整句用引号包起来；provider 默认取自配置文件：
+
+```bash
+bin/xcode.exe --workspace D:/path/to/repo "修复登录超时的 bug，改完跑通 go test"
+```
+
+运行中会实时显示每一步：读了哪些文件、执行了什么命令、策略判定和审批；结束后打印停止原因和本次 token 用量。
+
+### 交互模式（多轮对话）
+
+不带任务直接启动就进入 REPL，可以连续对话，上下文跨轮保留（provider 取自配置文件；装过 `xcode install` 的话直接敲 `xcode`）：
+
+```bash
+bin/xcode.exe
+```
+
+REPL 内置几个斜杠命令：
+
+```text
+/status             当前 provider、轮数、累计 token、已改文件、测试状态
+/model              切换模型供应商：菜单选择（或 /model deepseek 直接指定），
+                     写入配置文件并立即生效，对话历史保留
+/setup              同 /model
+/compact            压缩对话历史，释放上下文（工作笔记保留）
+/trust go test      信任某个命令前缀，本会话内执行它不再弹审批
+/clear              清空会话历史（项目记忆保留）
+/exit               退出
+/help               查看可用命令
+```
+
+退出时自动保存会话，下次启动会问你要不要接着上次继续。
+
+### 中断恢复
+
+任务跑到一半进程被杀（崩溃、断电、误关终端），加 `--resume` 从最后一个安全边界续跑，已完成的步骤不会重做：
+
+```bash
+bin/xcode.exe --resume
+```
+
+未完成的工具调用按副作用分别处理：只读的自动重试；改文件的先核对实际状态再重放；执行结果说不清的（比如一条 exec）一律列出来等你确认，绝不自作主张重跑。
+
+### 完成门禁
+
+默认情况下模型自己说完成就结束。如果任务有硬验收标准，写一份契约文件交给门禁把关：
+
+```json
+{
+  "goal": "修复 utils.go 中的越界访问",
+  "acceptance": ["go test 全部通过"],
+  "review": true,
+  "verify_commands": [
+    { "name": "go test", "command": ["go", "test", "./..."] }
+  ]
+}
+```
+
+```bash
+bin/xcode.exe --contract task.json "修复 utils.go 里的越界问题"
+```
+
+模型声称完成时，XCode 会在当前工作区真实运行 `verify_commands`，并派 reviewer 复查；不通过就打回继续修，直到通过或预算耗尽。
+
+### 评测
+
+新的外部评测入口和分阶段实施说明见 [evals/README.md](evals/README.md)。它运行真实 CLI，保存失败结果，统一计算主/子 agent 和摘要的模型预算，并提供 Harbor 适配和完整 patch 导出。
+
+到目前为止每一轮的判定结果汇总在 [evals/EVAL_RESULTS.md](evals/EVAL_RESULTS.md)：逐题判定、各实验臂使用的二进制、以及每项对照的已知局限。这些数字背后的原始轨迹、补丁和判分输出已作为 Release 附件发布。
+
+下面的 `xcode eval` 是内部小任务回归，不能据此宣称真实仓库能力或企业级可靠性。demo 模型只用于检查链路。
+
+用固定任务集跑分，多 Trial 取均值和方差：
+
+```bash
+# 离线跑分（demo 假模型，免费、结果可复现）
+bin/xcode.exe eval --trials 3 --label demo-baseline
+
+# 真实模型跑分
+bin/xcode.exe eval --provider bailian --trials 3 --label qwen-full
+
+# 单/多智能体对照：--no-delegate 关闭委派，再跑一轮对比
+bin/xcode.exe eval --provider bailian --trials 3 --label qwen-nodelegate --no-delegate
+
+# 固化基线，之后每次改动后对比（有回归时退出码非零，可当合入门禁）
+bin/xcode.exe eval baseline save qwen-full --run .eval/<run目录>
+bin/xcode.exe eval compare --baseline qwen-full --current .eval/<新run目录>
+```
+
+每次评测输出全部 Trial 的 JSONL 轨迹和 `report.json` / `report.md` / `report.html` 三种报告（成功率、轮数、token、重复读取、方差、失败聚类）。
+
+### 辅助命令
+
+```text
+xcode install                 可选：安装到用户 PATH，之后直接敲 xcode（卸载=删文件+移除PATH条目）
+xcode checkpoints                查看历次写前快照
+xcode restore --id <快照ID>      恢复到指定快照（需交互确认）
+xcode journal                    查看工具调用状态机（含崩溃窗口留下的 unknown）
+xcode policy check --tool exec --arguments '{"command":["go","test"]}'
+                                 预演一次策略判定，打印完整判定链路
+xcode eval-fault                 故障注入评测：对比不同压缩/恢复策略在崩溃场景下的表现
+```
+
+## 常用配置
+
+运行参数优先级：命令行 flag > 项目级 `.xcode/config` > 全局 `~/.xcode/config` > 内置默认值。常用的几项：
+
+```text
+developer=deepseek        # 开发模型：模型集里的槽位名（见下）
+reviewer=glm              # 审查模型：槽位名；不填则审查降级为开发模型并警告
+model.deepseek.key=sk-... # 模型集：model.<名字>.key / base-url / id，可配任意多个
+model.deepseek.base-url=https://api.deepseek.com
+model.deepseek.id=deepseek-flash
+orchestrate=              # 空(全工具智能体) / single / single-review / pipeline
+mode=workspace-write      # plan / workspace-write / full-access
+context-strategy=bounded  # bounded / none / sliding / handoff / compaction / decision-gated
+context-budget=6000      # 模型可见历史的估算 token 目标；不含工具说明
+max-steps=8               # 单次任务最大模型轮数
+sandbox=host              # host / docker / docker-wsl
+timeout=2m
+```
+
+其他可选文件：`.xcode/policy.json`（工具放行/拒绝规则）、`.xcode/skills/<角色>.md`（自定义 delegate 角色）、`.xcode/memory.md`（项目级记忆，每次运行注入）。
+
+默认 `bounded` 保留任务、项目要求和最近的完整工具往返，将较早结果收敛为带 artifact 引用的证据记录。完整历史仍保存，当前任务或最新一次工具往返过大时可以超过目标，工具调用和结果不会被拆开。`none` 可显式关闭压缩。每次模型调用还会收到最新的共享请求/token 余额及剩余时间；这些提示不重复写入会话历史。观察到生产修改且其后的命令成功退出时，提示会要求立即收尾；修改后连续多次调用没有任何成功验证时，提示会要求先做一次聚焦验证再结束。预算只够最后一次请求时（剩余请求为 1 或剩余 token 不足 5%），该请求直接禁用工具，让模型产出最终回答，而不是发起一个结果永远无人消费的工具调用。预算过半仍没有观察到生产修改时进入探索门禁：先禁用搜索与列目录，剩余不足三成再禁用命令执行，只留读文件、改文件和 diff，强制转入实现；一旦观察到生产修改，门禁立即解除。委派模式下每个智能体按各自进度受同一规则约束。
+
+命令执行前的快照支持符号链接：保存、恢复链接本身，不读取链接目标。构建工具所需的 Go 缓存、并发设置及已激活的 Python 环境会传给命令，模型 API 密钥不传给命令子进程。
+
+## 编排模式与跨模型审查
+
+`orchestrate` 决定协作拓扑，`--orchestrate` flag 优先于配置文件：
+
+- **single**：单智能体，模型看不到 delegate 工具；
+- **single-review**：单智能体 + 完成门禁强制审查（自动启用 review 契约）；
+- **pipeline**：流水线编排者——工具箱只保留 delegate 与 git_diff，禁止亲自改代码；
+  强制 planner（结构化诊断，预算上限为全 run 的 30%）→ developer（唯一编辑者）→
+  完成门禁。工位顺序由代码校验：developer 先于 planner 会被拒绝；编排者提前声称
+  完成会被门禁前置条件打回。
+
+完成门禁的 reviewer 是唯一必经的独立智能体：全新上下文、只看目标 + diff + 测试结果，
+不看开发过程。`reviewer-provider` 配置跨模型审查（如 glm）；未配置或运行期失败
+（token 耗尽、服务商异常）时**自动降级为开发者同模型并三重警告**（stderr 横幅 +
+`review.degraded` 事件 + 运行记录标记），绝不静默。探索门禁与运行时提示按 run 级
+共享账本判定——主智能体与全部子智能体共用同一本"是否有人改过生产代码"的账，
+晚期出生的子智能体不会因空白账本被误伤。
+
+## 测试
+
+```bash
+go test ./...
+go test -race ./...
+```

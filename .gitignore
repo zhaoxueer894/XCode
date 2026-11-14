@@ -7,13 +7,20 @@ coverage.out
 bin/
 .xcode-state/
 .eval/
+output/
 __pycache__/
 *.pyc
 
 # 项目级配置含密钥,永不入库;模板见 .xcode/config.example
+# 通配覆盖 "config copy"、"config - 副本" 这类手动备份,避免密钥随仓库提交
 .xcode/config
+.xcode/config*
+!.xcode/config.example
 
 # Agents may run go build inside the workspace; ignore their default outputs
 /xcode.exe
 /xcode
 /xcode-linux-amd64
+
+# Root-level PDFs (course guidelines, exported reports); subdirectory PDFs are unaffected
+/*.pdf

@@ -173,3 +173,17 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o .eval/pilot-rerun/bu
 启动或续跑时用 `>>` 追加 `.eval/ablation-driver.log`。续跑核对现有清单和二进制快照，并只把缺少 Harbor `result.json` 的题交给新 job。
 
 阶段预算版用 `sh evals/drive_ablation.sh --staged`，结果落在 `.eval/ablation/staged/`。正式开跑前可用 `--staged --pressure-task <冻结题 ID> --pressure-run <新编号>` 只跑 C 格的一道题，沿用正式预算和判分，结果落在 `.eval/ablation/staged-pressure/`。A/B/C 每题使用 50 万 token、100 次模型请求和 20 分钟运行上限，并使用同一可见功能检查。失败时最多返修一次，预留总 token 的 25% 和请求的 10%。功能通过后 B/C 做静态审查，独立 verifier 仍使用冻结题自带的判分。
+
+## 结果汇总与原始数据导出
+
+`evals/EVAL_RESULTS.md` 由脚本生成，逐个 trial 读取 Harbor 的 `result.json`，不手工填数：
+
+```bash
+python evals/export_results.py --summary-only   # 只刷新汇总表
+python evals/export_results.py                  # 汇总表 + 去重打包
+python evals/export_results.py --check <zip>    # 校验包内无个人路径、无长密钥
+```
+
+判定分三态：`pass` / `fail` 来自判分器的 `verifier_result.rewards.reward`；`no verdict` 表示没有任何 attempt 走到判分器（异常中断），这类题移出分母单独计数，避免把供应商故障算成模型能力。表里另列 `cut short`（预算耗尽或报错但仍被判分）与 `empty patch`（判为失败但补丁为空），提醒读者这两类失败混合了预算因素。
+
+打包时剔除可复现的二进制（33 份共 438 MB），并对 1 MB 以上的重复文件做内容去重——1.39 GB 的 `native.zip` 其实是同一份 5 MB 文件的 277 次拷贝。小文件一律保留原名，否则所有空补丁会因哈希相同而丢失路径。2.1 GB 的 `.eval/` 因此压到约 33 MB。个人账号名与仓库绝对路径在打包时替换为 `user` 和 `<repo>`。

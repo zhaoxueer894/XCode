@@ -1,0 +1,3416 @@
+{
+  "schema": 1,
+  "generated": "2026-11-15",
+  "runs": [
+    {
+      "cell": "ablation/a-missing-scores-retry/a-single",
+      "label": "Retry for single-agent trials whose verdict was missing",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10880": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 1,
+      "scored": 3,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 1,
+      "attempts": 3,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "421828b6a1a1aeb44c6da63d18763df28f77d794e5cab9b9cdb6adf1b13871ef"
+    },
+    {
+      "cell": "ablation/a-single",
+      "label": "Early A - single agent (partial task set)",
+      "variants": [
+        "xcode-v1",
+        "xcode-v2"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "cli__cli-477": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "django__django-10880": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13031": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 3,
+      "scored": 7,
+      "no_verdict": 3,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 3,
+      "attempts": 10,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "421828b6a1a1aeb44c6da63d18763df28f77d794e5cab9b9cdb6adf1b13871ef"
+    },
+    {
+      "cell": "ablation/b-single-review",
+      "label": "Early B - single agent + review (partial task set)",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "django__django-10880": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 2,
+      "scored": 2,
+      "no_verdict": 2,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 0,
+      "attempts": 4,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "421828b6a1a1aeb44c6da63d18763df28f77d794e5cab9b9cdb6adf1b13871ef"
+    },
+    {
+      "cell": "ablation/paired-first-review/relaxed-two/review-feedback",
+      "label": "Paired study - review feedback (relaxed gate)",
+      "variants": [
+        "xcode-v2"
+      ],
+      "calibration": false,
+      "tasks": {
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/paired-first-review/relaxed-two/self-check",
+      "label": "Paired study - unguided self-check (relaxed gate)",
+      "variants": [
+        "xcode-v2"
+      ],
+      "calibration": false,
+      "tasks": {
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/paired-first-review/study/review-feedback",
+      "label": "Paired study - independent review feedback",
+      "variants": [
+        "xcode-v1",
+        "xcode-v2",
+        "xcode-v3",
+        "xcode-v4",
+        "xcode-v6",
+        "xcode-v7",
+        "xcode-v8",
+        "xcode-v9"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-10880": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 6,
+      "scored": 8,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 2,
+      "attempts": 8,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/paired-first-review/study/self-check",
+      "label": "Paired study - unguided self-check",
+      "variants": [
+        "xcode-v1",
+        "xcode-v2",
+        "xcode-v3",
+        "xcode-v4",
+        "xcode-v6",
+        "xcode-v7",
+        "xcode-v8",
+        "xcode-v9"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-10880": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 6,
+      "scored": 8,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 2,
+      "attempts": 8,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/paired-first-review/sympy-observed-pair/review-feedback",
+      "label": "Observed pair on sympy-13031 - review feedback",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13031": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 1,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/paired-first-review/sympy-observed-pair/self-check",
+      "label": "Observed pair on sympy-13031 - unguided self-check",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13031": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/paired-first-submission/a-single",
+      "label": "Paired study - plain submission (no review, no self-check)",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-10880": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13031": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 5,
+      "scored": 10,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 3,
+      "attempts": 10,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/paired-review/smoke/review-feedback",
+      "label": "Smoke - review feedback",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 1,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/paired-review/smoke/self-check",
+      "label": "Smoke - unguided self-check",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 1,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/staged-a-aligned/a-single",
+      "label": "Staged ablation A - single agent",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "django__django-10880": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13031": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 6,
+      "scored": 10,
+      "no_verdict": 0,
+      "cut_short_scored": 3,
+      "empty_patch_failures": 3,
+      "attempts": 10,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/staged-glm429-retry/c-pipeline",
+      "label": "Pipeline retry after the reviewer quota reset",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "iamkun__dayjs-589": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13031": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 2,
+      "scored": 4,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 1,
+      "attempts": 4,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/c-pipeline",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 1,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "db9f74e3e6b5e41563dcfa8325a42448d16143eab3c8deb0c9d46546271e4f01"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-10/b-single-review",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-10/b-single-review",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 1,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "b063872de713b25696f4d1285f0a327207b7d3ff67903891b6c15ca3e898b4b9"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-11/b-single-review",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-11/b-single-review",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 1,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "2d39605074b3dba8ed0e1c52776fe22405376bfef25833740b2ba8bcf9bcc38a"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-12/b-single-review",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-12/b-single-review",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-2/c-pipeline",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-2/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 1,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "672b28f59522558e551a80f1d270ace82d8332a78d2183c9dab3b3ba5848d2c9"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-3/c-pipeline",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-3/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 1,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "b94481496847114ee5ced91173c123953d4dca3a7c31be3bf290b70d1048d442"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-4/c-pipeline",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-4/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "062ca8b10389d0ea29ea86689ff95f649726519ced5d9d9f1d0995d32876dcd7"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-5/c-pipeline",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-5/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 1,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "16bccd7bb99bab8e33323e0d0d9295f782c3850e59314e24bc0fc34317e6edce"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-6/c-pipeline",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-6/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "16bccd7bb99bab8e33323e0d0d9295f782c3850e59314e24bc0fc34317e6edce"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-7/c-pipeline",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-7/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "888e091db99ac432da444b74d5a9a1571cd657cfbf68c535ebe3bd208a8c56cc"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-8/c-pipeline",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-8/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "b063872de713b25696f4d1285f0a327207b7d3ff67903891b6c15ca3e898b4b9"
+    },
+    {
+      "cell": "ablation/staged-pressure/sympy__sympy-13091/run-9/c-pipeline",
+      "label": "ablation/staged-pressure/sympy__sympy-13091/run-9/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "b063872de713b25696f4d1285f0a327207b7d3ff67903891b6c15ca3e898b4b9"
+    },
+    {
+      "cell": "ablation/staged/b-single-review",
+      "label": "Staged ablation B - single agent + cross-model review",
+      "variants": [
+        "xcode-v1",
+        "xcode-v2",
+        "xcode-v3"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 2,
+          "recovered": true,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 2,
+          "recovered": true,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "django__django-10880": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "sympy__sympy-13031": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 6,
+      "scored": 10,
+      "no_verdict": 0,
+      "cut_short_scored": 5,
+      "empty_patch_failures": 2,
+      "attempts": 12,
+      "recovered_after_retry": 2,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/staged/c-pipeline",
+      "label": "Staged ablation C - planner / developer / reviewer pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "django__django-10880": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "sympy__sympy-13031": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 6,
+      "scored": 10,
+      "no_verdict": 0,
+      "cut_short_scored": 8,
+      "empty_patch_failures": 3,
+      "attempts": 10,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "f8033d163fab86d8fd236bd704f3c3dbcdacf365c60d2b128f27ef793a907df7"
+    },
+    {
+      "cell": "ablation/strict-bc/b-single-review",
+      "label": "Strict-review B - single agent + cross-model review",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "django__django-10880": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "sympy__sympy-13031": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        }
+      },
+      "resolved": 6,
+      "scored": 10,
+      "no_verdict": 0,
+      "cut_short_scored": 10,
+      "empty_patch_failures": 3,
+      "attempts": 10,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "2602366d719c062867ea3948154d7270c8381c5f1131c25840bcc56235ead906"
+    },
+    {
+      "cell": "ablation/strict-bc/c-pipeline",
+      "label": "Strict-review C - pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "django__django-10880": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "sympy__sympy-13031": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 6,
+      "scored": 10,
+      "no_verdict": 0,
+      "cut_short_scored": 10,
+      "empty_patch_failures": 2,
+      "attempts": 10,
+      "recovered_after_retry": 0,
+      "git_revision": "7eeaf1587ae7cc8a1b15b7d4183f77f14de79aa4",
+      "binary_sha256": "2602366d719c062867ea3948154d7270c8381c5f1131c25840bcc56235ead906"
+    },
+    {
+      "cell": "pilot-five",
+      "label": "Pilot round - five repositories",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "expressjs__express-3495": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "pallets__flask-5014": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "psf__requests-6028": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "zeromicro__go-zero-1783": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 1,
+      "scored": 4,
+      "no_verdict": 0,
+      "cut_short_scored": 3,
+      "empty_patch_failures": 1,
+      "attempts": 4,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "e51af418cebf32e87489959192a1ef2e37b62d7a6dbe5986875ae36c8dfd0809"
+    },
+    {
+      "cell": "pilot-five",
+      "label": "Verifier calibration on pilot-five",
+      "variants": [
+        "empty-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3495": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "grpc__grpc-go-2630": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "pallets__flask-5014": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "psf__requests-6028": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1783": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 0,
+      "no_verdict": 5,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 5,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "e51af418cebf32e87489959192a1ef2e37b62d7a6dbe5986875ae36c8dfd0809"
+    },
+    {
+      "cell": "pilot-five",
+      "label": "Verifier calibration on pilot-five",
+      "variants": [
+        "empty-v2"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3495": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "grpc__grpc-go-2630": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "pallets__flask-5014": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "psf__requests-6028": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1783": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 0,
+      "no_verdict": 5,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 5,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "e51af418cebf32e87489959192a1ef2e37b62d7a6dbe5986875ae36c8dfd0809"
+    },
+    {
+      "cell": "pilot-five",
+      "label": "Verifier calibration on pilot-five",
+      "variants": [
+        "empty-v3"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3495": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "grpc__grpc-go-2630": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "pallets__flask-5014": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "psf__requests-6028": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "zeromicro__go-zero-1783": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 4,
+      "no_verdict": 1,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 4,
+      "attempts": 5,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "e51af418cebf32e87489959192a1ef2e37b62d7a6dbe5986875ae36c8dfd0809"
+    },
+    {
+      "cell": "pilot-five",
+      "label": "Verifier calibration on pilot-five",
+      "variants": [
+        "empty-v4"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3495": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "grpc__grpc-go-2630": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "pallets__flask-5014": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "psf__requests-6028": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "zeromicro__go-zero-1783": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 5,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 5,
+      "attempts": 5,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "e51af418cebf32e87489959192a1ef2e37b62d7a6dbe5986875ae36c8dfd0809"
+    },
+    {
+      "cell": "pilot-five",
+      "label": "Verifier calibration on pilot-five",
+      "variants": [
+        "gold-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3495": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "grpc__grpc-go-2630": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "pallets__flask-5014": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "psf__requests-6028": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1783": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 0,
+      "no_verdict": 5,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 5,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "e51af418cebf32e87489959192a1ef2e37b62d7a6dbe5986875ae36c8dfd0809"
+    },
+    {
+      "cell": "pilot-five",
+      "label": "Verifier calibration on pilot-five",
+      "variants": [
+        "gold-v2"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3495": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "grpc__grpc-go-2630": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "pallets__flask-5014": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "psf__requests-6028": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1783": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 0,
+      "no_verdict": 5,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 5,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "e51af418cebf32e87489959192a1ef2e37b62d7a6dbe5986875ae36c8dfd0809"
+    },
+    {
+      "cell": "pilot-five",
+      "label": "Verifier calibration on pilot-five",
+      "variants": [
+        "gold-v3"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3495": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "grpc__grpc-go-2630": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "pallets__flask-5014": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "psf__requests-6028": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1783": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 0,
+      "no_verdict": 5,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 5,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "e51af418cebf32e87489959192a1ef2e37b62d7a6dbe5986875ae36c8dfd0809"
+    },
+    {
+      "cell": "pilot-five",
+      "label": "Verifier calibration on pilot-five",
+      "variants": [
+        "gold-v4"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3495": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "grpc__grpc-go-2630": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "pallets__flask-5014": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "psf__requests-6028": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1783": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 3,
+      "scored": 4,
+      "no_verdict": 1,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 5,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "e51af418cebf32e87489959192a1ef2e37b62d7a6dbe5986875ae36c8dfd0809"
+    },
+    {
+      "cell": "pilot-five",
+      "label": "Verifier calibration on pilot-five",
+      "variants": [
+        "gold-v5"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3495": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "grpc__grpc-go-2630": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "pallets__flask-5014": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "psf__requests-6028": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1783": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 4,
+      "scored": 5,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 5,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "e51af418cebf32e87489959192a1ef2e37b62d7a6dbe5986875ae36c8dfd0809"
+    },
+    {
+      "cell": "runtime-fix",
+      "label": "Runtime regression check (before fix)",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "expressjs__express-3695": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1969": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 2,
+      "no_verdict": 0,
+      "cut_short_scored": 2,
+      "empty_patch_failures": 0,
+      "attempts": 2,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "1dc56743947a1ce90d9fa58ee2d63a97af7ac4001320c07ead23c9d9e57947d7"
+    },
+    {
+      "cell": "runtime-fix",
+      "label": "Verifier calibration on runtime-fix",
+      "variants": [
+        "empty-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3695": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "zeromicro__go-zero-1969": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 2,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 2,
+      "attempts": 2,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "1dc56743947a1ce90d9fa58ee2d63a97af7ac4001320c07ead23c9d9e57947d7"
+    },
+    {
+      "cell": "runtime-fix",
+      "label": "Verifier calibration on runtime-fix",
+      "variants": [
+        "gold-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3695": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1969": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 2,
+      "scored": 2,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 2,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "1dc56743947a1ce90d9fa58ee2d63a97af7ac4001320c07ead23c9d9e57947d7"
+    },
+    {
+      "cell": "runtime-fix-v2",
+      "label": "Runtime regression check (after fix)",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "expressjs__express-3695": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1969": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 2,
+      "scored": 2,
+      "no_verdict": 0,
+      "cut_short_scored": 2,
+      "empty_patch_failures": 0,
+      "attempts": 2,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "1b2a4e524ab174baa1db09898f98a82de1c57e9c87892da0135fb8d06d064cda"
+    },
+    {
+      "cell": "runtime-fix-v2",
+      "label": "Verifier calibration on runtime-fix-v2",
+      "variants": [
+        "empty-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3695": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "zeromicro__go-zero-1969": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 2,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 2,
+      "attempts": 2,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "1b2a4e524ab174baa1db09898f98a82de1c57e9c87892da0135fb8d06d064cda"
+    },
+    {
+      "cell": "runtime-fix-v2",
+      "label": "Verifier calibration on runtime-fix-v2",
+      "variants": [
+        "gold-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "expressjs__express-3695": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-1969": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 2,
+      "scored": 2,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 2,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "1b2a4e524ab174baa1db09898f98a82de1c57e9c87892da0135fb8d06d064cda"
+    },
+    {
+      "cell": "stage-budget-frozen-602-20261111T090149Z/b-single-review",
+      "label": "stage-budget-frozen-602-20261111T090149Z/b-single-review",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "d2294395414429dc84388eb1d57995f87685e2b13b1119509bb9b0c9c45982e3"
+    },
+    {
+      "cell": "stage-budget-frozen-602-20261111T090149Z/c-pipeline",
+      "label": "stage-budget-frozen-602-20261111T090149Z/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "d2294395414429dc84388eb1d57995f87685e2b13b1119509bb9b0c9c45982e3"
+    },
+    {
+      "cell": "unseen-r2",
+      "label": "Round 2 - unseen tasks",
+      "variants": [
+        "xcode-v1",
+        "xcode-v2",
+        "xcode-v3"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-352": {
+          "verdict": "fail",
+          "attempts": 3,
+          "recovered": true,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "cli__cli-362": {
+          "verdict": "fail",
+          "attempts": 3,
+          "recovered": true,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "cli__cli-402": {
+          "verdict": "fail",
+          "attempts": 3,
+          "recovered": true,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "django__django-9296": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-379": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-556": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-569": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-12419": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-12481": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-12489": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 5,
+      "scored": 9,
+      "no_verdict": 1,
+      "cut_short_scored": 3,
+      "empty_patch_failures": 4,
+      "attempts": 16,
+      "recovered_after_retry": 3,
+      "git_revision": null,
+      "binary_sha256": "c9cf7d8bf0526539ffef38ad17595c3f445579dc77f7f61e8c46c833abf437d2"
+    },
+    {
+      "cell": "unseen-r2",
+      "label": "Verifier calibration on unseen-r2",
+      "variants": [
+        "empty-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "cli__cli-352": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "cli__cli-362": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "cli__cli-402": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-10097": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-10554": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-9296": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-379": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-556": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-569": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "sympy__sympy-12419": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "sympy__sympy-12481": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "sympy__sympy-12489": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 12,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 12,
+      "attempts": 12,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "c9cf7d8bf0526539ffef38ad17595c3f445579dc77f7f61e8c46c833abf437d2"
+    },
+    {
+      "cell": "unseen-r2",
+      "label": "Verifier calibration on unseen-r2",
+      "variants": [
+        "gold-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "cli__cli-352": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "cli__cli-362": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "cli__cli-402": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "django__django-10097": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10554": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-9296": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-379": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-556": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-569": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-12419": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-12481": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-12489": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 8,
+      "scored": 9,
+      "no_verdict": 3,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 12,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "c9cf7d8bf0526539ffef38ad17595c3f445579dc77f7f61e8c46c833abf437d2"
+    },
+    {
+      "cell": "unseen-r2",
+      "label": "Verifier calibration on unseen-r2",
+      "variants": [
+        "gold-v2"
+      ],
+      "calibration": true,
+      "tasks": {
+        "cli__cli-352": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-362": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-402": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 3,
+      "scored": 3,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 3,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "c9cf7d8bf0526539ffef38ad17595c3f445579dc77f7f61e8c46c833abf437d2"
+    },
+    {
+      "cell": "unseen-r2",
+      "label": "Verifier calibration on unseen-r2",
+      "variants": [
+        "gold-v3"
+      ],
+      "calibration": true,
+      "tasks": {
+        "cli__cli-352": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-362": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-402": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10097": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10554": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-9296": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-379": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-556": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-569": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-12419": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-12481": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-12489": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 11,
+      "scored": 12,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 12,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "c9cf7d8bf0526539ffef38ad17595c3f445579dc77f7f61e8c46c833abf437d2"
+    },
+    {
+      "cell": "unseen-r3",
+      "label": "Round 3 - unseen tasks",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-10880": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13031": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": true
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 3,
+      "scored": 8,
+      "no_verdict": 2,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 3,
+      "attempts": 10,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "7c452da9b5a8eea77f72a7e6e6082243d034a82cd25d3c128d94923559fd4e92"
+    },
+    {
+      "cell": "unseen-r3",
+      "label": "Verifier calibration on unseen-r3",
+      "variants": [
+        "empty-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "cli__cli-474": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "cli__cli-477": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-10880": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-10914": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-10973": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "sympy__sympy-13031": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "sympy__sympy-13091": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "sympy__sympy-13372": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 0,
+      "scored": 12,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 12,
+      "attempts": 12,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "7c452da9b5a8eea77f72a7e6e6082243d034a82cd25d3c128d94923559fd4e92"
+    },
+    {
+      "cell": "unseen-r3",
+      "label": "Verifier calibration on unseen-r3",
+      "variants": [
+        "gold-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-474": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-477": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10880": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10914": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-10973": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-589": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-591": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-602": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13031": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13091": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-13372": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 12,
+      "scored": 12,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 12,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "7c452da9b5a8eea77f72a7e6e6082243d034a82cd25d3c128d94923559fd4e92"
+    },
+    {
+      "cell": "unseen-ten",
+      "label": "Ten-task round",
+      "variants": [
+        "verify-gate-v1",
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-278": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "cli__cli-302": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "expressjs__express-3870": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "expressjs__express-5555": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-318": {
+          "verdict": "fail",
+          "attempts": 2,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-337": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-11618": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "sympy__sympy-12096": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-2537": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 4,
+      "scored": 9,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 3,
+      "attempts": 10,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "6ce0d646f653f3ffb7b7e1c2b8c2cb89ea9e60e96c532d3b583fe2c2dd5b0465"
+    },
+    {
+      "cell": "unseen-ten",
+      "label": "Verifier calibration on unseen-ten",
+      "variants": [
+        "empty-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "axios__axios-5085": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "axios__axios-5338": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "cli__cli-278": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "cli__cli-302": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "django__django-7530": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "expressjs__express-3870": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "expressjs__express-5555": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-318": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "iamkun__dayjs-337": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "sympy__sympy-11618": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "sympy__sympy-12096": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        },
+        "zeromicro__go-zero-2537": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": true
+        }
+      },
+      "resolved": 1,
+      "scored": 12,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 11,
+      "attempts": 12,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "6ce0d646f653f3ffb7b7e1c2b8c2cb89ea9e60e96c532d3b583fe2c2dd5b0465"
+    },
+    {
+      "cell": "unseen-ten",
+      "label": "Verifier calibration on unseen-ten",
+      "variants": [
+        "gold-v1"
+      ],
+      "calibration": true,
+      "tasks": {
+        "axios__axios-5085": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        },
+        "axios__axios-5338": {
+          "verdict": "no-verdict",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 0,
+      "no_verdict": 2,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 2,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "6ce0d646f653f3ffb7b7e1c2b8c2cb89ea9e60e96c532d3b583fe2c2dd5b0465"
+    },
+    {
+      "cell": "unseen-ten",
+      "label": "Verifier calibration on unseen-ten",
+      "variants": [
+        "gold-v2"
+      ],
+      "calibration": true,
+      "tasks": {
+        "axios__axios-5085": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "axios__axios-5338": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-278": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-302": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-7530": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 3,
+      "scored": 5,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 5,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "6ce0d646f653f3ffb7b7e1c2b8c2cb89ea9e60e96c532d3b583fe2c2dd5b0465"
+    },
+    {
+      "cell": "unseen-ten",
+      "label": "Verifier calibration on unseen-ten",
+      "variants": [
+        "gold-v3"
+      ],
+      "calibration": true,
+      "tasks": {
+        "axios__axios-5085": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "axios__axios-5338": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-278": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "cli__cli-302": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "django__django-7530": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "expressjs__express-3870": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "expressjs__express-5555": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-318": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "iamkun__dayjs-337": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-11618": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "sympy__sympy-12096": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        },
+        "zeromicro__go-zero-2537": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 10,
+      "scored": 12,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 12,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "6ce0d646f653f3ffb7b7e1c2b8c2cb89ea9e60e96c532d3b583fe2c2dd5b0465"
+    },
+    {
+      "cell": "workflow-repair-602-v1/b-single-review",
+      "label": "workflow-repair-602-v1/b-single-review",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "402127b9cce9d8e79d3254c5c58c876fe6a7e05cee9cb31b90d7aa4c6182d109"
+    },
+    {
+      "cell": "workflow-repair-602-v1/c-pipeline",
+      "label": "workflow-repair-602-v1/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "iamkun__dayjs-602": {
+          "verdict": "fail",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": true,
+          "empty_patch": false
+        }
+      },
+      "resolved": 0,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 1,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "402127b9cce9d8e79d3254c5c58c876fe6a7e05cee9cb31b90d7aa4c6182d109"
+    },
+    {
+      "cell": "workflow-repair-cli405-v1/b-single-review",
+      "label": "workflow-repair-cli405-v1/b-single-review",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 1,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "b6a96ccf7d1273684b09b27e6ec378549341b06057a71eb5f6e6f744a236fe72"
+    },
+    {
+      "cell": "workflow-repair-cli405-v1/c-pipeline",
+      "label": "workflow-repair-cli405-v1/c-pipeline",
+      "variants": [
+        "xcode-v1"
+      ],
+      "calibration": false,
+      "tasks": {
+        "cli__cli-405": {
+          "verdict": "pass",
+          "attempts": 1,
+          "recovered": false,
+          "cut_short": false,
+          "empty_patch": false
+        }
+      },
+      "resolved": 1,
+      "scored": 1,
+      "no_verdict": 0,
+      "cut_short_scored": 0,
+      "empty_patch_failures": 0,
+      "attempts": 1,
+      "recovered_after_retry": 0,
+      "git_revision": null,
+      "binary_sha256": "b6a96ccf7d1273684b09b27e6ec378549341b06057a71eb5f6e6f744a236fe72"
+    }
+  ],
+  "published": [
+    {
+      "round": "Round 2 (`evals/UNSEEN_R2_REPORT.md`)",
+      "published": "5/6",
+      "recomputed": "5/9 (1 no verdict)",
+      "why": "Same passes, different denominator. The report scores the 6 tasks that ran to completion and sets the 3 cli tasks aside as provider cut-offs. Here the denominator is every task the grader actually scored, so those 3 are counted (as failures) and flagged as cut-short. One further task never reached the grader and is listed as no-verdict."
+    },
+    {
+      "round": "Round 3 (`evals/UNSEEN_R3_REPORT.md`)",
+      "published": "3/8",
+      "recomputed": "3/8 (2 no verdict)",
+      "why": "Matches. Both sides exclude the 2 tasks that lost their patch and count the killed sympy-13031 run as a failure."
+    },
+    {
+      "round": "Pilot (`evals/PILOT_REPORT.md`)",
+      "published": "1/5 first pass",
+      "recomputed": "1/4",
+      "why": "The frozen first pass ran 4 of 5 tasks (grpc-go never called the model) and resolved 1, which is the 1/4 shown above. A later regrade, after the rule that forbade touching existing test files was corrected, resolved 2 more from the same patches with no new model calls."
+    }
+  ]
+}
