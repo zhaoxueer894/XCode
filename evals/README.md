@@ -168,9 +168,17 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o .eval/pilot-rerun/bu
 
 ## A/B/C 消融运行
 
-按交接文档第三节执行。预检、格子清单和 Harbor 适配器都从项目的 `.xcode/config` 读取 `developer`、`reviewer` 及对应的模型槽。密钥仅经进程环境传给 XCode。三个格子的 agent 都使用两模型端点的出网域名，独立 verifier 保持离线。[交接文档](../HANDOVER.md)
+三格用同一批 round 3 冻结题(10 道)、同一预算、同一个开跑前从当前 main 重建的 Linux 二进制，只有协作拓扑不同：A 单智能体无审查，B 单智能体 + GLM 跨模型审查，C 强制 planner → developer → reviewer。
 
-启动或续跑时用 `>>` 追加 `.eval/ablation-driver.log`。续跑核对现有清单和二进制快照，并只把缺少 Harbor `result.json` 的题交给新 job。
+预检、格子清单和 Harbor 适配器都从项目的 `.xcode/config` 读取 `developer`、`reviewer` 及对应的模型槽。密钥仅经进程环境传给 XCode。三个格子的 agent 都使用两模型端点的出网域名，独立 verifier 保持离线。
+
+先重建二进制再开跑，driver 会校验它比 HEAD 新，旧了直接拒跑：
+
+```bash
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o bin/xcode-linux-amd64 ./cmd/xcode
+```
+
+启动或续跑时用 `>>` 追加 `.eval/ablation-driver.log`。续跑核对现有清单和二进制快照，并只把缺少 Harbor `result.json` 的题交给新 job。driver 支持断点续跑：已完成的格子跳过，跑了一半的格子只补缺题到新的 `xcode-v*` job，已有 trial 原样保留不重跑，分析时按格子合并全部变体目录。
 
 阶段预算版用 `sh evals/drive_ablation.sh --staged`，结果落在 `.eval/ablation/staged/`。正式开跑前可用 `--staged --pressure-task <冻结题 ID> --pressure-run <新编号>` 只跑 C 格的一道题，沿用正式预算和判分，结果落在 `.eval/ablation/staged-pressure/`。A/B/C 每题使用 50 万 token、100 次模型请求和 20 分钟运行上限，并使用同一可见功能检查。失败时最多返修一次，预留总 token 的 25% 和请求的 10%。功能通过后 B/C 做静态审查，独立 verifier 仍使用冻结题自带的判分。
 
